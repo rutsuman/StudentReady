@@ -38,6 +38,66 @@ html, body {
     min-height: 10px !important; /* Set a visible minimum height */
     aspect-ratio: 12 / 1 !important; /* Width:Height = 12:1 ratio (4% width ÷ 0.33% height) */
 }
+/* Hotspot Gallery with text */
+.gallery-hotspot {
+    position: absolute !important;
+    transform: translate(-50%, -50%) !important;
+    cursor: pointer !important;
+    width: 6% !important; /* Slightly wider to accommodate text */
+    height: auto !important;
+    min-height: 25px !important; /* Taller for text */
+    aspect-ratio: 8 / 1 !important;
+    
+    /* Single box-shadow declaration */
+    box-shadow: 0 0 20px rgba(247, 255, 4, 0.9),
+                0 0 40px rgba(189, 245, 4, 0.7),
+                0 0 60px rgb(1, 73, 255);
+    
+    border-radius: 20%;
+    animation: galleryGlow 1s infinite alternate;
+    
+    /* Make it a flex container to center the text */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    
+    /* Text styling */
+    color: white !important;
+    font-size: 0.8vw !important; /* Responsive font size */
+    font-weight: bold !important;
+    text-shadow: 1px 1px 2px black !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+}
+
+.gallery-hotspot::after {
+    content: "Gallery";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: inherit;
+    font-weight: inherit;
+    text-shadow: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    white-space: nowrap;
+}
+
+@keyframes galleryGlow {
+    from {
+        box-shadow: 0 0 10px rgba(247, 255, 4, 0.5),
+                    0 0 20px rgba(189, 245, 4, 0.3),
+                    0 0 30px rgb(1, 73, 255);
+    }
+    to {
+        box-shadow: 0 0 30px rgba(247, 255, 4, 1),
+                    0 0 60px rgba(189, 245, 4, 0.9),
+                    0 0 90px rgb(1, 73, 255);
+    }
+}
+
 
 /* Debug: show hotspots
 .hotspot.debug {
@@ -197,7 +257,7 @@ select:focus {
     border:2px solid gold; /*gold border*/;
 }
 #quest-box.mvp .quest-cell:hover {
-    border-color:rgb(182, 150, 9) !important; /* slightly ligther brighter blue*/
+    border-color:rgb(182, 150, 9) !important; 
        
 }
 /*first row: difficulty aligned right*/
@@ -358,24 +418,22 @@ select:focus {
     background-color: rgba(182, 182, 182, 0.4);
 }
 /* MVP Hotspot glow*/
-.hotspot.mvp-glow {
-    box-shadow:
-        0 10px 30px rgba(255, 4, 4, 0.9),
-        0 20px 50px rgba(245, 4, 4, 0.5),
-        0 20px 70px rgba(255, 0, 0, 0.5);
-    border-radius: 20%;
-}
+
 .mvp-hotspot {
     box-shadow: 10px 10px 10px rgba(0, 0, 0, 0.9);
     border-radius: 0%;
-    animation: mvpGlow 0.3s infinite alternate;
+    animation: mvpGlow 0.5s infinite alternate;
 }
 @keyframes mvpGlow {
     from {
-        box-shadow: 0 0 0px rgba(238, 4, 4, 0);
+       box-shadow: 0 0 10px rgba(247, 255, 4, 0.5),
+                    0 0 20px rgba(189, 245, 4, 0.3),
+                    0 0 30px rgb(255, 1, 1);
     }
     to {
-        box-shadow: 0px 0px 40px rgb(255, 1, 1);
+        box-shadow: 0 0 30px rgba(247, 255, 4, 1),
+                    0 0 60px rgba(189, 245, 4, 0.9),
+                    0 0 90px rgb(255, 1, 1);
     }
 }
 
@@ -418,8 +476,12 @@ select:focus {
   color: #000000;
   font-family: 'Georgia', serif;
   z-index: 2;
-  font-size: clamp(16px, 2.2vw, 20px);   /* AUTO FIT TEXT */
-  max-height: 60vh;  /* SCROLL IF TOO LONG */
+
+  /* AUTO FIT TEXT */
+  font-size: clamp(16px, 2.2vw, 20px);
+
+  /* SCROLL IF TOO LONG */
+  max-height: 60vh;
   overflow-y: auto;
   padding-right: 10px;
 }
@@ -2636,7 +2698,6 @@ input:focus,
     gap: 15px;
     margin-bottom: 10px;
 }
-
 /* Field groups */
 .field-group {
     background-color: rgba(0,30,180,0.3);
@@ -2644,8 +2705,6 @@ input:focus,
     padding: 15px;
     border: 2px solid rgba(100,150,255,0.7);
 }
-
-
 .field-group label {
     display: block;
     margin-bottom: 8px;
@@ -2653,7 +2712,6 @@ input:focus,
     color: #fff;
     text-align: center;
 }
-
 .field-group input,
 .field-group textarea {
     width: 90%;
@@ -2677,7 +2735,6 @@ input:focus,
 #work-description{
   width: 97%;
 }
-
 /* Description help ============================================= */
 .description-container {
   position: relative;
@@ -2801,4 +2858,145 @@ input:focus,
   border-radius: 4px;
   font-style: italic;
   margin: 10px 0 20px 0;
+}
+
+/* ==============================Gallery Overlay ===================================*/
+#gallery-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 2000;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+#gallery-box {
+  background-color: rgba(0,30,180,0.3);
+  color: #fff;
+  border-radius: 10px;
+  padding: 15px;
+  max-width: 900px;
+  width: 90%;
+  margin: auto;
+  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+  position: relative;
+}
+
+.gallery-header {
+  text-align: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid rgba(100,150,255,0.7);
+}
+
+.gallery-header h2 {
+  color: #fff;
+  font-size: 24px;
+  margin: 0;
+}
+
+/* Gallery Grid */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 15px;
+  padding: 10px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.gallery-item {
+  background-color: rgba(0,30,180,0.3);
+  border: 2px solid rgba(100,150,255,0.7);
+  border-radius: 8px;
+  padding: 10px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+.gallery-item:hover {
+  transform: scale(1.02);
+  box-shadow: 0 0 15px rgba(100,150,255,0.5);
+}
+
+.gallery-thumbnail {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  background-color: rgba(0,0,0,0.2);
+}
+
+.gallery-title {
+  text-align: center;
+  font-size: 14px;
+  color: #fff;
+  margin-top: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gallery-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px;
+  color: rgba(255,255,255,0.6);
+  font-style: italic;
+}
+
+/* Close button for gallery */
+#close-gallery {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  cursor: pointer;
+  font-size: 20px;
+  color: #fff;
+  z-index: 1;
+}
+
+/* Scrollbar styling for gallery grid */
+.gallery-grid::-webkit-scrollbar {
+  width: 8px;
+}
+
+.gallery-grid::-webkit-scrollbar-track {
+  background: rgba(0,30,180,0.2);
+  border-radius: 4px;
+}
+
+.gallery-grid::-webkit-scrollbar-thumb {
+  background: rgba(100,150,255,0.5);
+  border-radius: 4px;
+}
+
+.gallery-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(100,150,255,0.7);
+}
+
+/* MVP Gallery Items - Gold theme */
+.gallery-item.mvp {
+    background-color: rgba(214, 180, 26, 0.521); /* Gold background */
+    border: 2px solid gold; /* Gold border */
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+}
+
+.gallery-item.mvp:hover {
+    border-color: rgb(182, 150, 9) !important;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+}
+
+.gallery-item.mvp .gallery-title {
+    color: gold;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.gallery-item.mvp .gallery-thumbnail {
+    border: 1px solid rgba(255, 215, 0, 0.5);
 }

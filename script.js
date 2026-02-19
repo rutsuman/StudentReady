@@ -236,6 +236,9 @@ document.addEventListener("DOMContentLoaded", () => {
   setTimeout(() => {
     initializeWorkOverlay();
   }, 500); // Small delay to ensure DOM is fully ready
+
+ // Initialize gallery
+  initializeGallery();
 });
 
 // ==========================
@@ -606,6 +609,11 @@ function switchMap(mapId) {
 // OPEN QUEST
 // ==========================
 function openQuest(cityId) {
+
+  if (cityId === "gallery") {
+    openGallery();
+    return;
+  }
   const mapId = getMapForQuest(cityId);
   if (mapId && mapId !== currentMap) {
     switchMap(mapId);
@@ -2551,14 +2559,19 @@ function saveWorkData() {
   // FIX: Use the correct ID names from your HTML
   studentWorks[questId] = {
     title: document.getElementById("work-title").value,
-    size: document.getElementById("work-size").value,        // Changed from "work-size-media"
-    media: document.getElementById("work-media").value,      // Changed from "work-media" (this one is correct)
+    size: document.getElementById("work-size").value,        
+    media: document.getElementById("work-media").value,      
     description: document.getElementById("work-description").value,
     image: imageSrc,
     lastModified: new Date().toISOString()
   };
 
   saveStudentWorks();
+  const galleryOverlay = document.getElementById("gallery-overlay");
+  if (galleryOverlay && galleryOverlay.style.display === "flex") {
+    renderGalleryItems();
+  }
+  
   alert("🎨 Work saved successfully!");
 }
 
@@ -4003,3 +4016,146 @@ if (document.readyState === 'loading') {
   initializeHelpModal();
 }
 
+
+// ==========================
+// GALLERY FUNCTIONS
+// ==========================
+
+// Open gallery overlay
+function openGallery() {
+  const overlay = document.getElementById("gallery-overlay");
+  if (!overlay) return;
+  
+  // Get student name from profile
+  const profile = loadStudentProfile() || {};
+  const studentName = profile.name || "Student";
+  
+  // Update header
+  const header = document.getElementById("gallery-student-name");
+  if (header) {
+    header.textContent = `${studentName}'s Art Gallery`;
+  }
+  
+  // Render gallery items
+  renderGalleryItems();
+  
+  // Show overlay
+  overlay.style.display = "flex";
+}
+
+// Close gallery overlay
+function closeGallery() {
+  const overlay = document.getElementById("gallery-overlay");
+  if (overlay) {
+    overlay.style.display = "none";
+  }
+}
+
+// Render all artworks in the gallery
+function renderGalleryItems() {
+  const galleryGrid = document.getElementById("gallery-grid");
+  if (!galleryGrid) return;
+  
+  // Clear current content
+  galleryGrid.innerHTML = "";
+  
+  // Get all works from studentWorks
+  const works = studentWorks || {};
+  const worksArray = Object.entries(works);
+  
+  if (worksArray.length === 0) {
+    galleryGrid.innerHTML = '<div class="gallery-empty">No artworks uploaded yet</div>';
+    return;
+  }
+  
+  // Create gallery items
+  worksArray.forEach(([questId, work]) => {
+    // Skip if work has no title and no image (empty work)
+    if (!work.title && !work.image && !work.description) return;
+    
+    const galleryItem = document.createElement("div");
+    galleryItem.className = "gallery-item";
+     const quest = quests[questId];
+    if (quest && quest.style === "mvp") {
+      galleryItem.classList.add("mvp");
+    }
+    galleryItem.dataset.questId = questId;
+    
+    // Create thumbnail (use image if available, otherwise placeholder)
+    const thumbnail = document.createElement("img");
+    thumbnail.className = "gallery-thumbnail";
+    
+    if (work.image) {
+      thumbnail.src = work.image;
+    } else {
+      // Use a placeholder or the quest character image
+      const quest = quests[questId];
+      thumbnail.src = quest?.character || "placeholder.png";
+      thumbnail.style.opacity = "0.7";
+    }
+    
+    thumbnail.alt = work.title || "Artwork";
+    
+    // Create title
+    const title = document.createElement("div");
+    title.className = "gallery-title";
+    title.textContent = work.title || "Untitled";
+    
+    // Assemble item
+    galleryItem.appendChild(thumbnail);
+    galleryItem.appendChild(title);
+    
+    // Add click event to open work overlay
+  galleryItem.addEventListener("click", () => {
+      closeGallery(); // Close gallery first
+      
+      // Small delay to allow gallery to close
+      setTimeout(() => {
+        // First open the quest popup
+        if (quests[questId]) {
+          openQuest(questId);
+          // Then automatically open the work overlay for this quest
+          setTimeout(() => {
+            openWorkOverlay(questId);
+          }, 100); // Wait 500ms for quest popup to fully render
+        }
+      }, 100);
+    });
+    
+    galleryGrid.appendChild(galleryItem);
+  });
+  
+  // If no items were added (all were empty), show empty message
+  if (galleryGrid.children.length === 0) {
+    galleryGrid.innerHTML = '<div class="gallery-empty">No artworks uploaded yet</div>';
+  }
+}
+
+// Initialize gallery event listeners
+function initializeGallery() {
+  // Close button
+  const closeBtn = document.getElementById("close-gallery");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", closeGallery);
+  }
+  
+  // Close on overlay click
+  const overlay = document.getElementById("gallery-overlay");
+  if (overlay) {
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) {
+        closeGallery();
+      }
+    });
+  }
+  
+  // Close on Escape key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      const galleryOverlay = document.getElementById("gallery-overlay");
+      if (galleryOverlay && galleryOverlay.style.display === "flex") {
+        closeGallery();
+      }
+    }
+  });
+}

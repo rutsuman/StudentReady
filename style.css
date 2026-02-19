@@ -133,7 +133,7 @@ Dropdown MENU content
     padding: 10px;
     border-radius: 5px;
     color: white;
-    z-index: 999;
+    z-index: 500;
 }
 
 /* Style for select elements */
@@ -717,7 +717,7 @@ select:focus {
   justify-content: center;
   align-items: center;
   background: rgba(0,0,0,0.65);
-  z-index: 1000;
+  z-index: 9999;
 }
 
 /* POPUP (match quest style) */
@@ -3000,4 +3000,5 @@ input:focus,
 .gallery-item.mvp .gallery-thumbnail {
     border: 1px solid rgba(255, 215, 0, 0.5);
 }
+
 

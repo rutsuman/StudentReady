@@ -388,9 +388,14 @@ function updateHotspotPositions() {
   const containerRect = mapContainer.getBoundingClientRect();
   const mapScale = scale || 1;
   
+  console.log("Current map:", currentMap); // Debug: see current map
+  
   document.querySelectorAll(".hotspot").forEach(hotspot => {
     const id = hotspot.dataset.city;
+    const mapAttr = hotspot.dataset.map; // Get the map attribute
     const position = hotspotPositions[id];
+    
+    console.log(`Hotspot ${id}: data-map="${mapAttr}", currentMap="${currentMap}"`); // Debug
     
     if (position) {
       // Apply the stored position
@@ -400,15 +405,22 @@ function updateHotspotPositions() {
       // Scale the hotspot with the map
       hotspot.style.transform = `translate(-50%, -50%) scale(${mapScale})`;
       
-      // Ensure hotspot is visible on correct map
-      hotspot.style.display = hotspot.dataset.map === currentMap ? "block" : "none";
+      // Check visibility
+      if (id === "gallery" || id === "pathfinder") { 
+        // Gallery should only show on map1
+        hotspot.style.display = currentMap === "map1" ? "block" : "none";
+      } else {
+        // Regular hotspots: show only on their assigned map
+        hotspot.style.display = mapAttr === currentMap ? "block" : "none";
+      }
       
       // Adjust z-index
       hotspot.style.zIndex = "1000";
+    } else {
+      console.log(`No position found for ${id}`);
     }
   });
 }
-
 // ==========================
 // LOAD QUESTS JSON & BIND HOTSPOTS
 // ==========================
@@ -565,16 +577,47 @@ document.addEventListener("DOMContentLoaded", () => {
 function bindHotspots() {
   document.querySelectorAll(".hotspot").forEach(hotspot => {
     const cityId = hotspot.dataset.city;
-    if (quests[cityId]?.style === "mvp") {
+    
+    // Special handling for pathfinder hotspot
+    if (cityId === "pathfinder") {
+      hotspot.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Open achievements overlay and switch to pathfinder tab
+        const achievementsOverlay = document.getElementById("achievements-overlay");
+        if (achievementsOverlay) {
+          achievementsOverlay.style.display = "flex";
+          
+          // Find and click the pathfinder tab
+          const pathfinderTab = document.querySelector('.tab-button[data-tab="pathfinder"]');
+          if (pathfinderTab) {
+            pathfinderTab.click();
+          }
+        }
+      });
+    } 
+    // Regular MVP styling for other hotspots
+    else if (quests[cityId]?.style === "mvp") {
       hotspot.classList.add("mvp-hotspot");
+      hotspot.addEventListener("click", () => {
+        if (MAPS[cityId]) {
+          switchMap(cityId);
+        } else {
+          openQuest(cityId);
+        }
+      });
     }
-    hotspot.addEventListener("click", () => {
-      if (MAPS[cityId]) {
-        switchMap(cityId);
-      } else {
-        openQuest(cityId);
-      }
-    });
+    // Regular hotspots
+    else {
+      hotspot.addEventListener("click", () => {
+        if (MAPS[cityId]) {
+          switchMap(cityId);
+        } else {
+          openQuest(cityId);
+        }
+      });
+    }
   });
 }
 
@@ -598,7 +641,9 @@ function switchMap(mapId) {
   // Wait for new map to load before updating hotspots
   mapImage.onload = () => {
     updateHotspotPositions();
-    closeQuest();
+      if (!keepQuestOpen) {
+      closeQuest();
+    }
   };
   
   const mapSelector = document.getElementById("map-selector");
@@ -616,7 +661,7 @@ function openQuest(cityId) {
   }
   const mapId = getMapForQuest(cityId);
   if (mapId && mapId !== currentMap) {
-    switchMap(mapId);
+    switchMap(mapId, true);
   }
 
   const quest = quests[cityId];
@@ -1345,6 +1390,415 @@ function renderAchievementsList() {
     });
   });
 }
+
+// =================================================
+// PATHFINDER QUESTIONNAIRE
+// =================================================
+
+let pathfinderQuestions = null;
+let allMVPQuests = null;
+let currentPathfinderAnswers = {};
+
+// Load pathfinder questions
+async function loadPathfinderQuestions() {
+  try {
+    const response = await fetch('pathfinder-questions.json');
+    pathfinderQuestions = await response.json();
+    console.log('Pathfinder questions loaded:', pathfinderQuestions);
+    return pathfinderQuestions;
+  } catch (error) {
+    console.error('Failed to load pathfinder questions:', error);
+    return null;
+  }
+}
+
+// Load MVP quests from quests.json
+function loadMVPQuests() {
+  if (!quests || Object.keys(quests).length === 0) {
+    console.warn('Quests not loaded yet');
+    return [];
+  }
+  
+  allMVPQuests = Object.entries(quests)
+    .filter(([id, quest]) => quest.style === 'mvp')
+    .map(([id, quest]) => ({
+      id,
+      title: quest.title,
+      path: Array.isArray(quest.path) ? quest.path[0] : quest.path || 'Unknown Path',
+      description: quest.description || ''
+    }));
+  
+  console.log('MVP Quests loaded:', allMVPQuests);
+  return allMVPQuests;
+}
+
+// Render the pathfinder questions
+// Render the pathfinder questions
+function renderPathfinderQuestions() {
+  console.log("Rendering pathfinder questions");
+  const container = document.getElementById('pathfinder-questions-container');
+  const introContainer = document.getElementById('pathfinder-intro');
+  const resultsContainer = document.getElementById('pathfinder-results-container');
+  const submitContainer = document.getElementById('pathfinder-submit-container');
+  
+  if (!container) {
+    console.error("Questions container not found!");
+    return;
+  }
+  
+  if (!pathfinderQuestions) {
+    console.error("No pathfinder questions loaded!");
+    return;
+  }
+  
+  // Hide results, show questions
+  resultsContainer.style.display = 'none';
+  submitContainer.style.display = 'block';
+  container.style.display = 'block'; // Make sure container is visible
+  
+  // Show intro
+  if (introContainer) {
+    introContainer.innerHTML = pathfinderQuestions.intro || '';
+  }
+  
+  // Clear container
+  container.innerHTML = '';
+  
+  // Reset answers
+  currentPathfinderAnswers = {};
+  
+  // Create each question
+  pathfinderQuestions.questions.forEach((question, index) => {
+    const questionDiv = document.createElement('div');
+    questionDiv.className = 'pathfinder-question';
+    questionDiv.dataset.questionId = question.id;
+    
+    // Question header
+    const header = document.createElement('h4');
+    header.textContent = `${question.id}. ${question.text}`;
+    questionDiv.appendChild(header);
+    
+    // Question note
+    if (question.note) {
+      const note = document.createElement('div');
+      note.className = 'pathfinder-question-note';
+      note.textContent = question.note;
+      questionDiv.appendChild(note);
+    }
+    
+    // Answers container
+    const answersDiv = document.createElement('div');
+    answersDiv.className = 'pathfinder-answers';
+    
+    // Create each answer
+    question.answers.forEach(answer => {
+      const answerId = `q${question.id}_${answer.letter}`;
+      
+      const answerWrapper = document.createElement('div');
+      answerWrapper.className = 'pathfinder-answer';
+      
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = `question_${question.id}`;
+      radio.value = answer.letter;
+      radio.id = answerId;
+      
+      const label = document.createElement('label');
+      label.htmlFor = answerId;
+      label.innerHTML = `<strong>${answer.letter})</strong> ${answer.text}`;
+      
+      answerWrapper.appendChild(radio);
+      answerWrapper.appendChild(label);
+      
+      // Add click handler to wrapper for better UX
+      answerWrapper.addEventListener('click', (e) => {
+        if (e.target.tagName !== 'INPUT') {
+          radio.checked = true;
+          // Trigger change event
+          const event = new Event('change', { bubbles: true });
+          radio.dispatchEvent(event);
+        }
+      });
+      
+      // Add change handler
+      radio.addEventListener('change', () => {
+        // Remove selected class from all answers in this question
+        document.querySelectorAll(`.pathfinder-question[data-question-id="${question.id}"] .pathfinder-answer`)
+          .forEach(el => el.classList.remove('selected'));
+        
+        // Add selected class to this answer
+        answerWrapper.classList.add('selected');
+        
+        // Store answer
+        currentPathfinderAnswers[question.id] = answer.letter;
+      });
+      
+      answersDiv.appendChild(answerWrapper);
+    });
+    
+    questionDiv.appendChild(answersDiv);
+    container.appendChild(questionDiv);
+  });
+  
+  console.log("Questions rendered, container display:", window.getComputedStyle(container).display);
+}
+// Process answers and find top quests
+function processPathfinderAnswers() {
+  console.log("=== PROCESSING PATHFINDER ANSWERS ===");
+  console.log("Current answers:", currentPathfinderAnswers);
+  // Check if all questions answered
+  const totalQuestions = pathfinderQuestions.questions.length;
+  const answeredCount = Object.keys(currentPathfinderAnswers).length;
+    console.log(`Questions: ${answeredCount}/${totalQuestions} answered`);
+  
+  if (answeredCount < totalQuestions) {
+    alert(`Please answer all ${totalQuestions} questions before finding your path.`);
+    return null;
+  }
+  
+    // Check if MVP quests are loaded
+  console.log("MVP Quests:", allMVPQuests);
+  
+  if (!allMVPQuests || allMVPQuests.length === 0) {
+    console.error("No MVP quests loaded!");
+    allMVPQuests = loadMVPQuests(); // Try loading again
+    console.log("Reloaded MVP Quests:", allMVPQuests);
+  }
+  // Initialize scores for all MVP quests
+  const scores = {};
+  allMVPQuests.forEach(quest => {
+    scores[quest.id] = 0;
+  });
+    console.log("Initialized scores:", scores);
+  // Apply scoring from answers
+  pathfinderQuestions.questions.forEach(question => {
+    const answerLetter = currentPathfinderAnswers[question.id];
+     console.log(`Question ${question.id}: Selected ${answerLetter}`);
+    const answerObj = question.answers.find(a => a.letter === answerLetter);
+      console.log(`Answer object:`, answerObj);
+    if (answerObj && answerObj.score) {
+            console.log(`Score mapping for Q${question.id}:`, answerObj.score);
+      Object.entries(answerObj.score).forEach(([questId, points]) => {
+        if (scores.hasOwnProperty(questId)) {
+          scores[questId] += points;
+            console.log(`  Added ${points} to ${questId} (now ${scores[questId]})`);
+        } else {
+          console.log(`  Quest ${questId} not in MVP list, skipping`);
+        }
+      });
+    }
+  });
+    console.log("Final scores:", scores);
+  // Convert to array and sort
+  const sortedQuests = Object.entries(scores)
+    .filter(([id, score]) => score > 0) // Only quests with points
+    .sort((a, b) => b[1] - a[1]) // Sort by score descending
+    .slice(0, 5) // Top 5
+    .map(([id, score]) => {
+      const quest = allMVPQuests.find(q => q.id === id);
+      return {
+        ...quest,
+        score
+      };
+    });
+  
+  console.log('Top quests:', sortedQuests);
+  return sortedQuests;
+}
+
+// Render results
+function renderPathfinderResults(topQuests) {
+  console.log("=== RENDERING PATHFINDER RESULTS ===");
+  console.log("Top quests to render:", topQuests);
+  
+  const questionsContainer = document.getElementById('pathfinder-questions-container');
+  const resultsContainer = document.getElementById('pathfinder-results-container');
+  const submitContainer = document.getElementById('pathfinder-submit-container');
+  const resultMessageDiv = document.getElementById('pathfinder-result-message');
+  const questListDiv = document.getElementById('pathfinder-quest-list');
+  
+  console.log("Elements found:", {
+    questionsContainer: !!questionsContainer,
+    resultsContainer: !!resultsContainer,
+    submitContainer: !!submitContainer,
+    resultMessageDiv: !!resultMessageDiv,
+    questListDiv: !!questListDiv
+  });
+  
+  if (!resultsContainer || !questListDiv) {
+    console.error("Required result elements not found!");
+    return;
+  }
+  
+  if (!topQuests || topQuests.length === 0) {
+    console.log("No top quests found");
+    if (resultMessageDiv) {
+      resultMessageDiv.innerHTML = '<p>No matching quests found. Try different answers!</p>';
+    }
+  } else {
+    // Find appropriate result message
+    const topQuestIds = topQuests.map(q => q.id);
+    console.log("Top quest IDs:", topQuestIds);
+    
+    let bestMessage = pathfinderQuestions.resultMessages.find(msg => 
+      msg.keywords.some(keyword => topQuestIds.includes(keyword))
+    );
+    
+    if (!bestMessage) {
+      bestMessage = {
+        message: "Your answers reveal a unique artistic path! The quests below match your interests. Choose the one that calls to you most strongly."
+      };
+    }
+    
+    console.log("Selected message:", bestMessage);
+    
+    if (resultMessageDiv) {
+      resultMessageDiv.innerHTML = `<p>${bestMessage.message}</p>`;
+    }
+    
+    // Render quest list
+    questListDiv.innerHTML = '';
+    console.log("Rendering", topQuests.length, "quests");
+    
+    topQuests.forEach((quest, index) => {
+      console.log(`Rendering quest ${index + 1}:`, quest);
+      
+      const questElement = document.createElement('div');
+      questElement.className = 'questlist-item';
+      questElement.dataset.questId = quest.id;
+      
+      const isCompleted = completedQuests[quest.id] || false;
+      const isActive = questAccepted[quest.id] || false;
+      
+      // Get path display
+      let pathDisplay = quest.path || 'Unknown Path';
+      
+      questElement.innerHTML = `
+        <div class="questlist-header">
+          <h3 class="questlist-title">${index + 1}. ${quest.title || 'Untitled'}</h3>
+          <span class="questlist-id">${quest.id}</span>
+        </div>
+        <div class="questlist-details">
+          <div>
+            <span class="questlist-path">${pathDisplay}</span>
+          </div>
+          <div>
+            ${isCompleted ? '<span class="questlist-completed">✓ Completed</span>' : ''}
+            ${isActive ? '<span class="questlist-timer active">🔴 Active</span>' : ''}
+          </div>
+        </div>
+      `;
+      
+      // Add click event
+      questElement.addEventListener('click', () => {
+        console.log("Quest clicked:", quest.id);
+        document.getElementById('achievements-overlay').style.display = 'none';
+        openQuest(quest.id);
+      });
+      
+      questListDiv.appendChild(questElement);
+    });
+  }
+  
+  // Hide questions, show results
+  console.log("Hiding questions, showing results");
+  if (questionsContainer) questionsContainer.style.display = 'none';
+  if (resultsContainer) resultsContainer.style.display = 'block';
+  if (submitContainer) submitContainer.style.display = 'none';
+}
+// Reset pathfinder
+function resetPathfinder() {
+  const questionsContainer = document.getElementById('pathfinder-questions-container');
+  const resultsContainer = document.getElementById('pathfinder-results-container');
+  const submitContainer = document.getElementById('pathfinder-submit-container');
+  
+  questionsContainer.style.display = 'block';
+  resultsContainer.style.display = 'none';
+  submitContainer.style.display = 'block';
+  
+  // Re-render questions to reset selections
+  renderPathfinderQuestions();
+}
+
+// Initialize pathfinder
+// Initialize pathfinder
+async function initializePathfinder() {
+  console.log("Initializing Pathfinder...");
+  
+  // Load questions
+  await loadPathfinderQuestions();
+  console.log("Pathfinder questions loaded in init");
+  
+  // Load MVP quests
+  loadMVPQuests();
+  console.log("MVP Quests loaded in init:", allMVPQuests);
+  
+  // Now render the questions
+  renderPathfinderQuestions();
+  
+  // Get elements and set up event listeners
+  const submitBtn = document.getElementById('pathfinder-submit');
+  const retakeBtn = document.getElementById('pathfinder-retake');
+  
+  console.log("Submit button:", submitBtn);
+  console.log("Retake button:", retakeBtn);
+  
+  // Submit button
+  if (submitBtn) {
+    // Remove any existing listeners
+    const newSubmitBtn = submitBtn.cloneNode(true);
+    submitBtn.parentNode.replaceChild(newSubmitBtn, submitBtn);
+    
+    newSubmitBtn.addEventListener('click', () => {
+      console.log("Submit button clicked");
+      const topQuests = processPathfinderAnswers();
+      if (topQuests) {
+        renderPathfinderResults(topQuests);
+      }
+    });
+  }
+  
+  // Retake button
+  if (retakeBtn) {
+    const newRetakeBtn = retakeBtn.cloneNode(true);
+    retakeBtn.parentNode.replaceChild(newRetakeBtn, retakeBtn);
+    
+    newRetakeBtn.addEventListener('click', () => {
+      console.log("Retake button clicked");
+      resetPathfinder();
+    });
+  }
+}
+
+// Update the tab click handler
+document.querySelectorAll(".achievements-tabs .tab-button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    // Remove active class from all tabs
+    document.querySelectorAll(".tab-button").forEach(b => b.classList.remove("active"));
+    
+    // Add active class to clicked tab
+    btn.classList.add("active");
+
+    // Hide all tab content
+    document.querySelectorAll(".tab-content").forEach(tab => tab.style.display = "none");
+    
+    // Show the selected tab content
+    const tabId = "tab-" + btn.dataset.tab;
+    document.getElementById(tabId).style.display = "block";
+    
+    // Handle specific tab functionality
+    if (btn.dataset.tab === "questlist") {
+      renderQuestList(document.getElementById("questlist-filter").value);
+    } else if (btn.dataset.tab === "pathfinder") {
+      // Initialize pathfinder if needed
+      if (!pathfinderQuestions) {
+        initializePathfinder();
+      } else {
+      }
+    }
+  });
+});
+
 
 // ==========================
 // RUBRIC POPUP + GRADING
@@ -3832,23 +4286,47 @@ function initializeQuestList() {
 // Tab switching logic (this is already in your code, just ensure it has the questlist logic)
 document.querySelectorAll(".achievements-tabs .tab-button").forEach(btn => {
   btn.addEventListener("click", () => {
+    // Remove active class from all tabs
     document.querySelectorAll(".tab-button").forEach(b => b.classList.remove("active"));
+    
+    // Add active class to clicked tab
     btn.classList.add("active");
 
+    // Hide all tab content
     document.querySelectorAll(".tab-content").forEach(tab => tab.style.display = "none");
-    document.getElementById("tab-" + btn.dataset.tab).style.display = "block";
     
-    // Only render if it's the questlist tab AND if it hasn't been rendered yet
+    // Show the selected tab content
+    const tabId = "tab-" + btn.dataset.tab;
+    document.getElementById(tabId).style.display = "block";
+    
+    // Handle specific tab functionality
     if (btn.dataset.tab === "questlist") {
-      const container = document.getElementById('questlist-container');
-      // Check if container is empty before rendering
-      if (!container || container.innerHTML.trim() === '') {
-        renderQuestList(document.getElementById("questlist-filter").value);
+      renderQuestList(document.getElementById("questlist-filter").value);
+    } else if (btn.dataset.tab === "pathfinder") {
+      // First, make sure the container is visible
+      const questionsContainer = document.getElementById('pathfinder-questions-container');
+      const resultsContainer = document.getElementById('pathfinder-results-container');
+      const submitContainer = document.getElementById('pathfinder-submit-container');
+      
+      // Initialize pathfinder if needed
+      if (!pathfinderQuestions) {
+        // Show loading state
+        if (questionsContainer) {
+          questionsContainer.innerHTML = '<div style="color: white; text-align: center; padding: 20px;">Loading questionnaire...</div>';
+          questionsContainer.style.display = 'block';
+        }
+        if (resultsContainer) resultsContainer.style.display = 'none';
+        if (submitContainer) submitContainer.style.display = 'block';
+        
+        // Then initialize
+        initializePathfinder();
+      } else {
+        resetPathfinder();
       }
     }
   });
 });
-// Add this to your existing JS file
+
 
 // ==========================
 // RESPONSIVE HELPER FUNCTIONS

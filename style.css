@@ -57,7 +57,7 @@ html, body {
     animation: galleryGlow 1s infinite alternate;
     
     /* Make it a flex container to center the text */
-    display: flex !important;
+    display: flex;
     align-items: center !important;
     justify-content: center !important;
     
@@ -2958,3 +2958,4 @@ input:focus,
 .gallery-item.mvp .gallery-thumbnail {
     border: 1px solid rgba(255, 215, 0, 0.5);
 }
+

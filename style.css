@@ -98,6 +98,67 @@ html, body {
     }
 }
 
+/* Pathfinder Hotspot with text */
+.pathfinder-hotspot {
+    position: absolute !important;
+    transform: translate(-50%, -50%) !important;
+    cursor: pointer !important;
+    width: 7% !important; /* Slightly wider for longer text */
+    height: auto !important;
+    min-height: 25px !important;
+    aspect-ratio: 8 / 1 !important;
+    
+    /* Different color scheme for Pathfinder */
+    box-shadow: 0 0 20px rgba(153, 105, 255, 0.9),  /* Hot pink */
+                0 0 40px rgba(43, 101, 226, 0.7),  /* Blue violet */
+                0 0 60px rgba(161, 20, 255, 0.5);  /* Deep pink */
+    
+    border-radius: 20%;
+    animation: pathfinderGlow 1.5s infinite alternate;
+    
+    /* Flex container to center the text */
+    display: flex;
+    align-items: center !important;
+    justify-content: center !important;
+    
+    /* Text styling */
+    color: white !important;
+    font-size: 0.8vw !important;
+    font-weight: bold !important;
+    text-shadow: 1px 1px 2px black !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+    white-space: nowrap;
+}
+
+.pathfinder-hotspot::after {
+    content: "Pathfinder";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: inherit;
+    font-weight: inherit;
+    text-shadow: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    white-space: nowrap;
+}
+
+@keyframes pathfinderGlow {
+    from {
+        box-shadow: 0 0 10px rgba(133, 105, 255, 0.5),
+                    0 0 20px rgba(138, 43, 226, 0.3),
+                    0 0 30px rgba(255, 20, 147, 0.2);
+    }
+    to {
+        box-shadow: 0 0 30px rgb(105, 190, 255),
+                    0 0 60px rgba(138, 43, 226, 0.9),
+                    0 0 90px rgba(55, 20, 255, 0.7);
+    }
+}
+
 
 /* Debug: show hotspots
 .hotspot.debug {
@@ -1172,8 +1233,8 @@ select:focus {
     z-index: 9999;
     padding: 20px;
 }
-/* Achievements container - match quest popup style */
-#achievements-overlay .quest-box {
+/* Achievements container - */
+   #achievements-overlay .quest-box {
     background-color: rgba(0,30,180,0.3);
     color: #fff;
     border-radius: 10px;
@@ -1221,6 +1282,7 @@ select:focus {
 #achievements-overlay .tab-content {
   grid-column: 1 / -1;
   width: 100%;
+
 }
 /* Completed quests grid */
 #achievements-overlay .completed-grid {
@@ -1228,12 +1290,29 @@ select:focus {
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   margin-top: 10px;
+  max-height: none;
+  height: auto;
 }
-/* Path column style */
+/* Path column style*/
 #achievements-overlay .completed-grid > div {
   border: 2px solid rgba(150,200,255,1);
   padding: 12px;
   border-radius: 10px;
+  max-height: 70%;
+  overflow: auto;
+}
+
+#achievements-overlay .completed-grid > div::-webkit-scrollbar {
+    width: 8px;
+}
+
+#achievements-overlay .completed-grid > div::-webkit-scrollbar-thumb {
+    background: rgba(100, 150, 255, 0.5);
+    border-radius: 4px;
+}
+
+#achievements-overlay .completed-grid > div::-webkit-scrollbar-track {
+    background: rgba(0, 30, 180, 0.1);
 }
 /* Path title */
 #achievements-overlay .completed-grid h3 {
@@ -1286,6 +1365,27 @@ select:focus {
   padding-left: 0;
   margin-top: 10px;
 }
+/* Achievements list*/
+#achievements-list {
+    max-height: 80vh;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+/* Custom scrollbar for achievements list (match your theme) */
+#achievements-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+#achievements-list::-webkit-scrollbar-thumb {
+    background: rgba(100, 150, 255, 0.5);
+    border-radius: 4px;
+}
+
+#achievements-list::-webkit-scrollbar-track {
+    background: rgba(0, 30, 180, 0.1);
+}
+/*_______________________________________________________________________*/
 .achievement-item.expanded .achievement-quests {
   display: block;
 }
@@ -2959,3 +3059,299 @@ input:focus,
     border: 1px solid rgba(255, 215, 0, 0.5);
 }
 
+
+
+/*================================QUESTIONNAIRE STYLING ================================*/
+
+/* Tabs should span full width */
+#achievements-overlay .achievements-tabs {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 0;
+    flex-wrap: wrap; /* Allow wrapping on small screens */
+}
+
+/* Tab content should span full width and have scroll */
+#achievements-overlay .tab-content {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-height: 50%;
+    padding-right: 5px;
+}
+
+/* Custom scrollbar for tab content */
+#achievements-overlay .tab-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+#achievements-overlay .tab-content::-webkit-scrollbar-thumb {
+    background: rgba(100, 150, 255, 0.5);
+    border-radius: 4px;
+}
+
+#achievements-overlay .tab-content::-webkit-scrollbar-track {
+    background: rgba(0, 30, 180, 0.1);
+}
+
+/* Pathfinder container */
+.pathfinder-container {
+    width: 100%;
+    padding: 5px;
+    box-sizing: border-box;
+}
+
+/* Pathfinder intro - match questlist filter style */
+#pathfinder-intro {
+    background: rgba(0, 30, 180, 0.15);
+    border-radius: 8px;
+    border: 2px solid rgba(100, 150, 255, 0.3);
+    padding: 15px;
+    margin-bottom: 20px;
+    color: white;
+}
+
+#pathfinder-intro h2 {
+    margin-top: 0;
+    color: white;
+    font-size: 1.4em;
+}
+
+/* Questions container with scroll */
+#pathfinder-questions-container {
+    max-height: 45vh;
+    overflow-y: auto;
+    padding-right: 8px;
+    margin-bottom: 15px;
+}
+
+/* Custom scrollbar for questions */
+#pathfinder-questions-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+#pathfinder-questions-container::-webkit-scrollbar-thumb {
+    background: rgba(100, 150, 255, 0.5);
+    border-radius: 4px;
+}
+
+#pathfinder-questions-container::-webkit-scrollbar-track {
+    background: rgba(0, 30, 180, 0.1);
+}
+
+/* Question styling - match quest item style */
+.pathfinder-question {
+    background: rgba(0, 30, 180, 0.15);
+    border: 2px solid rgba(100, 150, 255, 0.3);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+}
+
+.pathfinder-question:hover {
+    background: rgba(0, 30, 180, 0.25);
+    border-color: rgba(150, 200, 255, 1);
+    box-shadow: 0 0 15px rgba(150, 200, 255, 0.4);
+}
+
+.pathfinder-question h4 {
+    margin: 0 0 5px 0;
+    color: white;
+    font-size: 1.1em;
+}
+
+.pathfinder-question-note {
+    color: aqua;
+    font-style: italic;
+    font-size: 0.9em;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed rgba(100, 150, 255, 0.3);
+}
+
+/* Answers container */
+.pathfinder-answers {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Answer option styling */
+.pathfinder-answer {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: rgba(0, 30, 180, 0.2);
+    border: 1px solid rgba(100, 150, 255, 0.2);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.pathfinder-answer:hover {
+    background: rgba(0, 30, 180, 0.3);
+    border-color: rgba(150, 200, 255, 0.6);
+}
+
+.pathfinder-answer.selected {
+    background: rgba(0, 30, 180, 0.4);
+    border: 2px solid aqua;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+.pathfinder-answer input[type="radio"] {
+    margin-top: 3px;
+    cursor: pointer;
+    accent-color: aqua; /* Makes radio button match theme */
+}
+
+.pathfinder-answer label {
+    flex: 1;
+    cursor: pointer;
+    color: white;
+    line-height: 1.4;
+}
+
+.pathfinder-answer label strong {
+    color: aqua;
+    margin-right: 5px;
+}
+
+/* Submit button - match tab button style */
+#pathfinder-submit {
+    background: rgba(0, 30, 180, 0.3);
+    border: 2px solid rgba(100, 150, 255, 0.7);
+    color: white;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    transition: all 0.3s;
+    width: 100%;
+    margin-top: 10px;
+}
+
+#pathfinder-submit:hover {
+    background: rgba(0, 30, 180, 0.5);
+    border-color: aqua;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+}
+
+/* Results container */
+#pathfinder-results-container {
+    width: 100%;
+    
+}
+
+#pathfinder-result-message {
+    background: rgba(0, 30, 180, 0.15);
+    border: 2px solid rgba(100, 150, 255, 0.3);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-left: 4px solid aqua;
+    line-height: 1.5;
+    color: white;
+}
+
+#pathfinder-result-message p {
+    margin: 0;
+}
+
+/* Results quest list */
+#pathfinder-quest-list {
+    max-height: 40vh;
+    overflow-y: auto;
+    padding-right: 5px;
+    margin-bottom: 15px;
+}
+
+/* Scrollbar for results list */
+#pathfinder-quest-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+#pathfinder-quest-list::-webkit-scrollbar-thumb {
+    background: rgba(100, 150, 255, 0.5);
+    border-radius: 4px;
+}
+
+#pathfinder-quest-list::-webkit-scrollbar-track {
+    background: rgba(0, 30, 180, 0.1);
+}
+
+/* Force results to be visible when displayed */
+#pathfinder-results-container[style*="display: block"] {
+    display: block !important;
+}
+
+/* Make sure questions are hidden when results show */
+#pathfinder-questions-container[style*="display: none"] {
+    display: none !important;
+}
+
+/* Debug outline to see if container is there but invisible */
+#pathfinder-results-container {
+    min-height: 100px;
+    max-height: 90%;
+    background: rgba(0,0,0,0.2);
+}
+
+/* Retake button */
+#pathfinder-retake {
+    background: rgba(0, 30, 180, 0.2);
+    border: 2px solid rgba(100, 150, 255, 0.5);
+    color: white;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s;
+}
+
+#pathfinder-retake:hover {
+    background: rgba(0, 30, 180, 0.4);
+    border-color: aqua;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    #achievements-overlay .quest-box {
+        max-height: 90vh;
+        padding: 10px;
+    }
+    
+    #achievements-overlay .tab-content {
+        max-height: 70vh;
+    }
+    
+    #pathfinder-questions-container {
+        max-height: 50vh;
+    }
+    
+    .pathfinder-question {
+        padding: 12px;
+    }
+    
+    .pathfinder-answer {
+        padding: 8px 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .pathfinder-question h4 {
+        font-size: 1em;
+    }
+    
+    .pathfinder-answer label {
+        font-size: 0.9em;
+    }
+    
+    #pathfinder-intro h2 {
+        font-size: 1.2em;
+    }
+}

@@ -15,7 +15,9 @@
 
     <!-- Gallery Hotspot -->
     <div class="hotspot debug gallery-hotspot" data-map="map1" data-city="gallery" style="top:68.3%; left:53%;" title="View Art Gallery"></div>
-   
+    <!-- Pathfinder Hotspot -->
+    <div class="hotspot debug pathfinder-hotspot" data-map="map1" data-city="pathfinder" style="top:66.4%; left:40%;" title="Find Your Path"></div>
+
     <!-- quests for map1 painter's path-->
     <div class="hotspot debug" data-map="map1" style="top:51.5%; left:48%;" data-city="quest1"></div>
     <div class="hotspot debug" data-map="map1" style="top:47.5%; left:35%;" data-city="quest2"></div>
@@ -96,7 +98,7 @@
     <div class="hotspot debug" data-map="map3" style="top: 67.3%; left:30%;" data-city="quest71"></div>
 </div>
 
-<!-- Dropdown menu container -->
+<!----------------------------------------- Dropdown menu container ----------------------------------------------->
 <div id="dropdown-container">
     <select id="path-selector">
         <option value="">Select a Path</option>
@@ -130,8 +132,7 @@
     </div>
 </div>    
 </div>
-
-<!-- Quest pop up -->
+<!----------------------------------------- QUEST POP UP OVERLAY--------------------------------------------------->
 <div id="quest-overlay">
     <div id="quest-box">
         <span id="close-quest" onclick="closeQuest()">✖</span>
@@ -234,10 +235,9 @@
             </div>
             </div>
         </div>
-    </div>
 </div>
-<!-- WORKS OVERLAY =================================================================-->
- <div id="work-overlay" class="work-overlay">
+<!------------------------------------------- WORKS OVERLAY ------------------------------------------------------->
+<div id="work-overlay" class="work-overlay">
   <div class="overlay-content">
     <!-- Close Button (optional but recommended) -->
     <button class="close-overlay" type="button">×</button>
@@ -277,8 +277,8 @@
       </div>
     </form>
   </div>
- </div>
-<!------------- Help Modal Overlay -------------------------------------------------------------->
+</div>
+<!------------------------------------------- Help Overlay -------------------------------------------------------->
 <div id="helpModal" class="modal">
   <div class="modal-content">
     <div class="modal-header">
@@ -328,8 +328,7 @@
     </div>
   </div>
 </div>
-
-<!----------------------------------- GALLERY OVERLAY ------------------------------------------------------------>
+<!------------------------------------------ GALLERY OVERLAY ------------------------------------------------------>
 <div id="gallery-overlay" class="quest-overlay" style="display:none;">
   <div id="gallery-box" class="quest-box gallery-box">
     <span id="close-gallery" class="close-btn">✖</span>
@@ -346,7 +345,7 @@
     </div>
   </div>
 </div>
-<!-- WELCOME OVERLAY-------------------- ---------------------------------------------->
+<!-------------------------------------------- WELCOME OVERLAY----------------------------------------------------->
 <div id="welcome-overlay" class="welcome-overlay">
   <div class="welcome-scroll">
     <div class="scroll-top"></div>
@@ -369,7 +368,7 @@
     <div class="scroll-bottom"></div>
    </div>
 </div>
-<!-- STUDENT SETUP POPUP ------------------------------------------------------------->
+<!-------------------------------------------- Student set up ----------------------------------------------------->
 <div id="student-setup-overlay" class="welcome-overlay" style="display:none;">
   <div class="welcome-scroll">
     <div class="scroll-body">
@@ -387,7 +386,7 @@
     </div>
   </div>
 </div>
-<!--Rationale pop up------------------------------------------------------------------->
+<!--------------------------------------------Rationale pop up----------------------------------------------------->
 <div id="rationale-overlay" class="welcome-overlay">
   <div class="welcome-scroll">
     <div class="scroll-body">
@@ -399,27 +398,24 @@
 </div>
 <!--parchment sound-->
 <audio id="unroll-sound" src="unroll.m4a" preload="auto"></audio>
-
 <!-- Achievements Button -->
 <button id="achievements-btn" class="achievements-btn">🏆 Achievements</button>
-
-<!-- Achievements Popup -->
+<!-------------------------------------------- ACHIEVEMENTS OVERLAY------------------------------------------------>
 <div id="achievements-overlay" class="quest-overlay">
   <div class="quest-box">
     <span id="close-achievements" class="close-btn">✖</span>
-
     <div class="achievements-tabs">
       <button class="tab-button active" data-tab="completed">Completed Quests</button>
       <button class="tab-button" data-tab="achievements">Achievements</button>
       <button class="tab-button" data-tab="questlist">Quest List</button>
+      <button class="tab-button" data-tab="pathfinder">Pathfinder</button>
     </div>
-
     <div class="tab-content" id="tab-completed">
       <div id="completed-quests-grid" class="completed-grid"></div>
     </div>
-
     <div class="tab-content" id="tab-achievements" style="display:none;">
-      <div id="achievements-list"></div>
+      <div id="achievements-list"> 
+      </div>
     </div>
     <div class="tab-content" id="tab-questlist" style="display:none;">
       <!-- Filter Controls -->
@@ -441,12 +437,27 @@
       </div>
       <!-- Quest List Container -->
       <div id="questlist-container" class="questlist-container">
-        <!-- Quests will be dynamically populated here -->
       </div>
+    </div>
+    <div class="tab-content" id="tab-pathfinder" style="display:none;">
+     <div class="pathfinder-container">
+      <div id="pathfinder-intro"></div>
+      <div id="pathfinder-questions-container"></div>
+        <div id="pathfinder-results-container" style="display: none;">
+          <h4 style="color: white; margin-bottom: 10px;">Based on your answers, your top 5 recommended quests are:</h4>
+          <div id="pathfinder-quest-list" class="questlist-container"></div>
+          <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button id="pathfinder-retake" class="tab-button" style="flex: 1;">Retake Questionnaire</button>
+          </div>
+        </div>
+          <div id="pathfinder-submit-container" style="margin-top: 20px;">
+          <button id="pathfinder-submit" class="tab-button" style="width: 100%; padding: 12px;">Find My Path</button>
+          </div>
+     </div>
     </div>
   </div>
 </div>
-<!-- Rubric Overlay -->
+<!-------------------------------------------- Rubric Overlay ----------------------------------------------------->
 <div id="rubric-overlay" class="quest-overlay" style="display:none;">
   <div class="quest-box rubric-box">
     <span class="close-btn" id="close-rubric">✖</span>
@@ -455,117 +466,101 @@
     <div id="rubric-content"></div>
   </div>
 </div>
-<!--PROFILE====================================================================-->
-<!-- PROFILE BUTTON -->
+<!-- Profile Button -->
 <button id="profile-btn" class="profile-btn">
   <img src="profile.png" alt="Profile" />
 </button>
-
-<!-- PROFILE POPUP -->
+<!--------------------------------------------PROFILE OVERLAY------------------------------------------------------>
 <div id="profile-overlay" class="overlay" style="display:none;">
     <div id="profile-popup" class="popup">
         <h2 class="profile-title">Student's Profile</h2>
-
-    <button id="profile-close" class="close-btn">×</button>
-
-    <div class="profile-grid">
-      <!-- LEFT COLUMN -->
-      <div class="profile-left">
-          <div class="avatar-wrapper">
-            <img id="student-avatar" src="profile.png" alt="avatar">
-            <button id="change-avatar-btn" class="avatar-gear">⚙️</button>
-          </div>
-          <div id="student-name" class="student-name"></div>
-          <div class="profile-left">  
-          <div class="profile-action-buttons">
-            <button id="save-profile-btn" class="profile-btn-small save-btn"> 💾 Save</button>
-            <label for="load-profile-input" class="profile-btn-small load-btn">📂 Load
-            <input type="file" id="load-profile-input" accept=".json" class="file-input-hidden"></label>
-          </div>
-          </div>
-          <div class="profile-money">
-          <span class="money-icon">Reward:</span>
-          <span id="profile-total-coins" class="money-amount">0</span>
+        <button id="profile-close" class="close-btn">×</button>
+        <div class="profile-grid">
+          <!-- LEFT COLUMN -->
+            <div class="profile-left">
+                <div class="avatar-wrapper">
+                  <img id="student-avatar" src="profile.png" alt="avatar">
+                  <button id="change-avatar-btn" class="avatar-gear">⚙️</button>
+                </div>
+                <div id="student-name" class="student-name"></div>
+                <div class="profile-left">  
+                 <div class="profile-action-buttons">
+                  <button id="save-profile-btn" class="profile-btn-small save-btn"> 💾 Save</button>
+                  <label for="load-profile-input" class="profile-btn-small load-btn">📂 Load
+                  <input type="file" id="load-profile-input" accept=".json" class="file-input-hidden"></label>
+                 </div>
+                </div>
+                <div class="profile-money">
+                  <span class="money-icon">Reward:</span>
+                  <span id="profile-total-coins" class="money-amount">0</span>
+                </div>
+                <button id="deduct-rewards-btn" class="deduct-btn" title="Teacher only - Deduct spent rewards">
+                💸 Deduct Rewards
+                </button>
+                <button id="restart-tour-btn" class="tour-btn">🔄 Tour</button>
+            </div>
+          <!-- CENTER COLUMN -->
+            <div class="profile-center" id="radar-chart-container">
+             <canvas id="radar-chart"></canvas>
+             <div id="radar-tooltip" class="radar-tooltip"></div>
+            </div>
+          <!-- RIGHT COLUMN -->
+            <div class="profile-right">
+            <h3>Art Standards</h3>
+            <ul id="standards-list"></ul>
+              <!-- art standards -->
+              <table id="standards-table">
+                <thead>
+                  <tr>
+                    <th>Standard</th>
+                    <th>Grade</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr data-standard="Art.FA.CR.1.1.IA">
+                    <td>Generate</td>
+                    <td></td>
+                  </tr>
+                  <tr data-standard="Art.FA.CR.1.2.IA">
+                    <td>Practice</td>
+                    <td></td>
+                  </tr>
+                  <tr data-standard="Art.FA.CR.2.1.IA">
+                    <td>Explore</td>
+                    <td></td>
+                  </tr>
+                  <tr data-standard="Art.FA.CR.2.3.IA">
+                    <td>Transform</td>
+                    <td></td>
+                  </tr>
+                  <tr data-standard="Art.FA.CR.3.1.IA">
+                    <td>Reflect</td>
+                    <td></td>
+                  </tr>
+                  <tr data-standard="Art.FA.PR.6.1.IA">
+                    <td>Analyze</td>
+                    <td></td>
+                  </tr>
+                  <tr data-standard="Art.FA.RE.8.1.8A">
+                    <td>Interpret</td>
+                    <td></td>
+                  </tr>
+                  <tr data-standard="Art.FA.CN.10.1.IA">
+                    <td>Document</td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
         </div>
-
-           <button id="deduct-rewards-btn" class="deduct-btn" title="Teacher only - Deduct spent rewards">
-        💸 Deduct Rewards
-    </button>
-
-        <button id="restart-tour-btn" class="tour-btn">🔄 Tour</button>
-      </div>
-    <!-- CENTER COLUMN -->
-    <div class="profile-center" id="radar-chart-container">
-    <canvas id="radar-chart"></canvas>
-    <div id="radar-tooltip" class="radar-tooltip"></div>
     </div>
-
-
-<!-- RIGHT COLUMN -->
-<div class="profile-right">
-  <h3>Art Standards</h3>
-
-  <ul id="standards-list">
-    <!-- Art Standards go here -->
-  </ul>
-
-  <!-- New Table below art standards -->
-  <table id="standards-table">
-    <thead>
-      <tr>
-        <th>Standard</th>
-        <th>Grade</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr data-standard="Art.FA.CR.1.1.IA">
-        <td>Generate</td>
-        <td></td>
-      </tr>
-  
-      <tr data-standard="Art.FA.CR.1.2.IA">
-        <td>Practice</td>
-        <td></td>
-      </tr>
-      <tr data-standard="Art.FA.CR.2.1.IA">
-        <td>Explore</td>
-        <td></td>
-      </tr>
-      <tr data-standard="Art.FA.CR.2.3.IA">
-        <td>Transform</td>
-        <td></td>
-      </tr>
-      <tr data-standard="Art.FA.CR.3.1.IA">
-        <td>Reflect</td>
-        <td></td>
-      </tr>
-      <tr data-standard="Art.FA.PR.6.1.IA">
-        <td>Analyze</td>
-        <td></td>
-      </tr>
-      <tr data-standard="Art.FA.RE.8.1.8A">
-        <td>Interpret</td>
-        <td></td>
-      </tr>
-      <tr data-standard="Art.FA.CN.10.1.IA">
-        <td>Document</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
 </div>
-</div>
-</div> <!-- end profile-grid -->
-</div> <!-- end profile-popup -->
-</div> <!-- end profile-overlay -->
-
-<!-- Welcome Tour - Integrated into map -->
+<!--------------------------------------------- Welcome Tour --------- --------------------------------------------->
 <div id="welcome-tour-container" style="display: none;">
   <!-- Tour Image - positioned absolutely -->
   <div id="welcome-tour-image-wrapper">
     <img id="welcome-tour-image" src="" alt="Tour guide">
   </div>
-  
   <!-- Talk Bubble -->
   <div id="welcome-tour-talk-bubble">
     <div id="welcome-tour-text">Welcome to your art adventure! Let me show you around...</div>

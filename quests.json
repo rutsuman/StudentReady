@@ -2853,7 +2853,7 @@
       "reward": "you got money!!!!",
       "character": "charimage/char35.gif",
       "style": "mvp",
-      "prerequisites": ["quest34"],
+      "prerequisites": ["quest5","quest34"],
       "completed": false,
       "timer": {
     "allottedMinutes": 300},

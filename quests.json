@@ -932,7 +932,7 @@
     "requirements": [
       "Paint/draw at least 4 cubes",
       "Each cube must show a different texture",
-      "Use acrylic paint only",
+      "Use acrylic paint/pencil/charcoal",
       "Textures must be visually distinct"
     ],
     "rubric": {

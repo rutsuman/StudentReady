@@ -3284,6 +3284,66 @@
     "accepted": false,
     "acceptedAt": null
   },
+   "quest73": {
+    "path": ["Sketcher Path"],
+    "difficulty": 1,
+    "title": "The Path of the Endless Line",
+    "rationale": "<h2>The Path of the Endless Line</h2><p><strong>Why it’s important:</strong><br>This formative quest introduces the foundational power of line in drawing. By focusing on a single, unbroken line, you learn to see drawing as a continuous, flowing movement rather than a series of disconnected marks. This builds confidence and control.</p><p><strong>Skills developed:</strong></p><ul><li>Hand-eye coordination and fluidity</li><li>Controlling line weight through pressure</li><li>Creating complex compositions from a simple element</li><li>Understanding line as both contour and form</li><li>Building muscle memory for confident mark-making</li></ul><p>This quest acts as a stepping stone to the more complex summative version, allowing for experimentation and risk-taking without the pressure of a final grade.</p>",
+    "description": "The Order of Wayfinders teaches that every journey begins with a single line. Before you embark on your epic quest, you must first practice the basics. Your task is to create a one-line drawing. Let your pen or pencil glide across the page without lifting it. It may twist, loop, overlap, or change thickness, but it must be continuous. The goal is not to draw an object, but to explore the expressive potential of a single, endless line.",
+    "requirements": [
+      "Use a single, continuous line without lifting your drawing tool.",
+      "Experiment with varying the line's thickness by changing pressure.",
+      "Fill a significant portion of your page with the line's movement.",
+      "Avoid creating recognizable objects or symbols; focus on abstract shapes and flow.",
+      "Complete at least two practice sketches."
+    ],
+    "rubric": {
+      "overall": "The Path of the Endless Line",
+      "standards": [
+        {
+          "code": "Art.FA.CR.1.2.IA",
+          "name": "Technique & Line Control",
+          "levels": {
+            "4": "Line is confidently continuous with dynamic and intentional variation in thickness and flow.",
+            "3": "Line is continuous with some noticeable variation in thickness and flow.",
+            "2": "Line is mostly continuous, but variation is minimal or hesitant.",
+            "1": "Line is broken or the drawing tool was lifted; little to no variation."
+          }
+        },
+        {
+          "code": "Art.FA.CR.3.1.IA",
+          "name": "Experimentation & Risk-Taking",
+          "levels": {
+            "4": "Shows bold experimentation with loops, overlaps, and density, creating a complex and engaging composition.",
+            "3": "Shows clear effort to experiment with line movement and fill the space.",
+            "2": "The composition is simple or sparse; experimentation is limited.",
+            "1": "The line is basic and shows little attempt to explore the page or technique."
+          }
+        }
+      ]
+    },
+    "links": [
+      {
+        "type": "One line drawing samples",
+        "url": "https://www.google.com.hk/search?newwindow=1&sca_esv=fc61e45fbff3d32e&udm=2&fbs=ADc_l-Z6XGGbkKmpylZqg2J7ZOuVNvV7jKtLqzLZ63dd2zPtrsojpaijeJRLrp4clUvcwVKNu3rFKn9HrtsZobwKMZoTjEjgIcooz5FwDW7ak7DYS75-N_l1m55YlKhB8Mm3WceMN6rEt7L-_mM10NDtjtv_qOoyKT2wmp8Pjhr5toQeN9wu1d4&q=one+line+drawing&sa=X&ved=2ahUKEwjHzr_yxvOSAxUm1vACHVj4NuEQtKgLegQIEhAB"
+      },
+      {
+        "type": "Video sample",
+        "url": "https://www.youtube.com/watch?v=rU8Xt8YBB3M"
+      }
+    ],
+    "reward": "",
+    "character": "charimage/char73.gif",
+    "style": "",
+    "prerequisites": [],
+    "completed": false,
+    "timer": {
+      "allottedMinutes": 75
+    },
+    "accepted": false,
+    "acceptedAt": null
+  },
+
 
 
 
@@ -3547,11 +3607,18 @@
           }
         ]
       },
-      "links": [""],
-      "reward": "you got money!!!!",
+      "links": [
+        {
+          "type": "Armature sample",
+          "url": "https://www.youtube.com/watch?v=js1_4ehETxI"
+        },
+        {
+          "type": "Video sample",
+          "url": "https://www.youtube.com/watch?v=2_BAaBJSwPI&list=PLziuS8DWCpjU7QFuM6wRH5C1R37aqb6OC&index=2"}],
+      "reward": "",
       "character": "charimage/char57.gif",
       "style": "mvp",
-      "prerequisites": [],
+      "prerequisites": ["quest73"],
       "completed": false,
       "timer": {
     "allottedMinutes": 750},

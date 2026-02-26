@@ -161,12 +161,12 @@ html, body {
 }
 
 
-/* Debug: show hotspots*/
+/* Debug: show hotspots
 .hotspot.debug {
     background: rgba(224, 50, 50, 0.461);
 }
 
-/* Grid overlay*/
+/* Grid overlay
 #map-container::after {
     content: "";
     position: absolute;
@@ -3478,3 +3478,4 @@ input:focus,
 .money-link:hover {
     opacity: 0.8;
 }
+

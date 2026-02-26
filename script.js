@@ -1,3479 +1,4952 @@
-/* =======================================
-   Map Container & Image
-   ======================================= */
+console.log("profile button:", document.getElementById("profile-btn"));
+console.log("canvas:", document.getElementById("radar-chart"));
 
-html, body {
-    margin: 0;
-    padding: 0;
-    overflow-x: hidden; /* no horizontal scroll */
-    overflow-y: auto;   /* vertical scroll allowed */
-    font-family: Arial, sans-serif;
+const MVP_PASSWORD = "eduardo182"; // change later
+let rubricLocked = loadRubricLocks();
+let teacherMode = false;
+let currentMap = "map1";
+let completedQuests = loadQuestData();
+let questGrades = loadQuestGrades() || {};
+let gradingEnabled = false;
+let currentQuestId = null;
+let scale = 1;
+let quests = {}; // store all quests
+let questTimers = {}; // Store active timers
+let questStartTimes = loadQuestStartTimes(); // Load saved start times
+let questAccepted = loadQuestAccepted(); // Track which quests have been accepted
+let questRewards = loadQuestRewards() || {}; // Reward system
+let standardDeductions = loadStandardDeductions(); // Object: { standardCode: totalDeducted }
+let studentWorks = loadStudentWorks();
+let hotspotPositions = {};
+
+// ==========================
+// STANDARD NAMES FOR REWARDS BREAKDOWN
+// ==========================
+const STANDARD_NAMES = {
+    "Art.FA.CR.1.1.IA": "Generate: Conceptualize artistic ideas",
+    "Art.FA.CR.1.2.IA": "Practice: Organize and develop ideas",
+    "Art.FA.CR.2.1.IA": "Explore: Refine artistic work",
+    "Art.FA.CR.2.3.IA": "Transform: Document creative process",
+    "Art.FA.CR.3.1.IA": "Reflect: Reflect on artistic process",
+    "Art.FA.PR.6.1.IA": "Analyze: Convey meaning through presentation",
+    "Art.FA.RE.8.1.8A": "Interpret: Interpret intent and meaning",
+    "Art.FA.CN.10.1.IA": "Document: Synthesize and relate knowledge"
+};
+
+const STANDARD_SHORT_NAMES = {
+    "Art.FA.CR.1.1.IA": "Generate",
+    "Art.FA.CR.1.2.IA": "Practice",
+    "Art.FA.CR.2.1.IA": "Explore",
+    "Art.FA.CR.2.3.IA": "Transform",
+    "Art.FA.CR.3.1.IA": "Reflect",
+    "Art.FA.PR.6.1.IA": "Analyze",
+    "Art.FA.RE.8.1.8A": "Interpret",
+    "Art.FA.CN.10.1.IA": "Document"
+};
+
+function loadStudentWorks() {
+  const data = localStorage.getItem("studentWorks");
+  if (data) {
+    try {
+      return JSON.parse(data);
+    } catch (e) {
+      console.error("Error parsing studentWorks:", e);
+      return {};
+    }
+  }
+  return {}; // Always return an object, even if no data
 }
 
-/* Map container */
-#map-container {
-    position: absolute !important;
-    width: 100%; /* Changed from 100vw */
-    max-width: 100%; /* Ensure it doesn't exceed viewport */
-    height: auto;
-    min-height: 100vh; /* Ensure it has height */
-    margin: 0 auto; /* Center it */
+// Initialize studentWorks
+
+
+function saveStudentWorks() {
+  localStorage.setItem("studentWorks", JSON.stringify(studentWorks));
 }
 
-/* Map image */
-#map-image {
-    width: 100%;
-    height: auto;
-    display: block;
-   max-width: 100%;
-}
+function openWorkOverlay(questId) {
+  const overlay = document.getElementById("work-overlay");
+  if (!overlay) {
+    console.error("Work overlay element not found!");
+    return;
+  }
 
-/* Hotspots */
-.hotspot {
-     position: absolute !important;
-    transform: translate(-50%, -50%) !important;
-    cursor: pointer !important;
-    width: 4% !important;
-    height: auto !important; /* Let it be determined by min-height */
-    min-height: 10px !important; /* Set a visible minimum height */
-    aspect-ratio: 12 / 1 !important; /* Width:Height = 12:1 ratio (4% width ÷ 0.33% height) */
-}
-/* Hotspot Gallery with text */
-.gallery-hotspot {
-    position: absolute !important;
-    transform: translate(-50%, -50%) !important;
-    cursor: pointer !important;
-    width: 6% !important; /* Slightly wider to accommodate text */
-    height: auto !important;
-    min-height: 25px !important; /* Taller for text */
-    aspect-ratio: 8 / 1 !important;
+  // Use currentQuestId if no questId is provided
+  const targetQuestId = questId || currentQuestId;
+  
+  if (!targetQuestId) {
+    console.error("No quest ID available to open work overlay");
+    return;
+  }
+
+  console.log(`Opening work overlay for quest: ${targetQuestId}`);
+  
+  overlay.style.display = "flex";
+  overlay.dataset.questId = targetQuestId;
+
+  // Load saved data if exists
+  if (studentWorks[targetQuestId]) {
+    const work = studentWorks[targetQuestId];
+
+    document.getElementById("work-title").value = work.title || "";
+    document.getElementById("work-size").value = work.size || "";
+    document.getElementById("work-media").value = work.media || "";
+    document.getElementById("work-description").value = work.description || "";
+
+    const preview = document.getElementById("image-preview");
+    if (work.image && preview) {
+      preview.src = work.image;
+      preview.style.display = "block";
+    }
+  } else {
+    // Clear form for new work
+    document.getElementById("work-title").value = "";
+    document.getElementById("work-size").value = "";
+    document.getElementById("work-media").value = "";
+    document.getElementById("work-description").value = "";
     
-    /* Single box-shadow declaration */
-    box-shadow: 0 0 20px rgba(247, 255, 4, 0.9),
-                0 0 40px rgba(189, 245, 4, 0.7),
-                0 0 60px rgb(1, 73, 255);
+    const preview = document.getElementById("image-preview");
+    if (preview) {
+      preview.src = "";
+      preview.style.display = "none";
+    }
+  }
+}
+
+function closeWorkOverlay() {
+  const overlay = document.getElementById("work-overlay");
+  if (!overlay) return;
+  overlay.style.display = "none";
+}
+
+function saveWorkData() {
+  const overlay = document.getElementById("work-overlay");
+  const questId = overlay.dataset.questId;
+  
+  if (!questId) {
+    alert("Error: No quest associated with this work.");
+    return;
+  }
+
+  // Get image preview source
+  const preview = document.getElementById("image-preview");
+  const imageSrc = preview && preview.src ? preview.src : "";
+
+  studentWorks[questId] = {
+    title: document.getElementById("work-title").value,
+    size: document.getElementById("work-size").value,
+    media: document.getElementById("work-media").value,
+    description: document.getElementById("work-description").value,
+    image: imageSrc,
+    lastModified: new Date().toISOString()
+  };
+
+  saveStudentWorks();
+  alert("🎨 Work saved successfully!");
+}
+
+function deleteWorkImage() {
+  const preview = document.getElementById("image-preview");
+  if (preview) {
+    preview.src = "";
+    preview.style.display = "none";
+  }
+  
+  // Clear the file input
+  const imageInput = document.getElementById("work-image");
+  if (imageInput) {
+    imageInput.value = "";
+  }
+  
+  // Also remove the image from the saved data for the current quest
+  const overlay = document.getElementById("work-overlay");
+  const questId = overlay.dataset.questId;
+  
+  if (questId && studentWorks[questId]) {
+    studentWorks[questId].image = "";
+    saveStudentWorks();
+  }
+}
+
+function initializeWorkOverlay() {
+  console.log("Initializing work overlay...");
+  
+  // Set up the "Finished Work" button click handler
+  const finishedWorkBtn = document.getElementById("finished-work-btn");
+  if (finishedWorkBtn) {
+    // Remove the inline onclick attribute to prevent conflicts
+    finishedWorkBtn.removeAttribute("onclick");
     
-    border-radius: 20%;
-    animation: galleryGlow 1s infinite alternate;
+    // Add proper event listener
+    finishedWorkBtn.addEventListener("click", function(e) {
+      e.preventDefault();
+      console.log("Finished Work button clicked, currentQuestId:", currentQuestId);
+      
+      if (!currentQuestId) {
+        alert("Please open a quest first to add your work.");
+        return;
+      }
+      
+      openWorkOverlay(currentQuestId);
+    });
+  } else {
+    console.warn("Finished Work button not found in DOM");
+  }
+
+  // Close button in overlay
+  const closeButtons = document.querySelectorAll("#work-overlay .close-overlay, #work-overlay button[onclick='closeWorkOverlay()']");
+  closeButtons.forEach(btn => {
+    btn.removeAttribute("onclick");
+    btn.addEventListener("click", function(e) {
+      e.preventDefault();
+      closeWorkOverlay();
+    });
+  });
+
+  // Delete image button
+  const deleteBtn = document.getElementById("delete-work-image");
+  if (deleteBtn) {
+    deleteBtn.removeAttribute("onclick");
+    deleteBtn.addEventListener("click", function(e) {
+      e.preventDefault();
+      deleteWorkImage();
+    });
+  }
+
+  // Image upload preview
+  const imageInput = document.getElementById("work-image");
+  if (imageInput) {
+    imageInput.addEventListener("change", function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      // Check file size (limit to 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert("File is too large. Please select an image under 5MB.");
+        return;
+      }
+
+      // Check file type
+      if (!file.type.startsWith("image/")) {
+        alert("Please select an image file.");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const preview = document.getElementById("image-preview");
+        if (preview) {
+          preview.src = event.target.result;
+          preview.style.display = "block";
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Save button
+  const saveBtn = document.querySelector(".save-work");
+  if (saveBtn) {
+    saveBtn.addEventListener("click", function(e) {
+      e.preventDefault();
+      saveWorkData();
+    });
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  
+  // Initialize work overlay
+  setTimeout(() => {
+    initializeWorkOverlay();
+  }, 500); // Small delay to ensure DOM is fully ready
+
+  // Initialize gallery
+  initializeGallery();
+  updateProfileUI();
+  recalculateAllQuestRewards();
+
+  // Initialize rewards overlay
+  initializeRewardsOverlay();
+
+  const container = document.getElementById("map-container");
+});
+
+
+// Load standard deductions from localStorage
+function loadStandardDeductions() {
+    const data = localStorage.getItem("standardDeductions");
+    return data ? JSON.parse(data) : {};
+}
+
+// Save standard deductions to localStorage
+function saveStandardDeductions() {
+    localStorage.setItem("standardDeductions", JSON.stringify(standardDeductions));
+}
+
+
+// ==========================
+// STUDENT PROFILE SAVE/LOAD
+// ==========================
+function saveStudentProfile(profile) {
+  localStorage.setItem("studentProfile", JSON.stringify(profile));
+}
+
+function loadStudentProfile() {
+  const data = localStorage.getItem("studentProfile");
+  return data ? JSON.parse(data) : null;
+}
+
+function updateProfileUI() {
+  const profile = loadStudentProfile();
+  if (!profile) return;
+
+  const avatar = document.getElementById("student-avatar");
+  const name = document.getElementById("student-name");
+  const profileBtn = document.querySelector(".profile-btn"); 
+
+    const profileBtnImg = profileBtn ? profileBtn.querySelector("img") : null;
+
+  if (avatar) avatar.src = profile.character;
+  if (name) name.innerText = profile.name;
+
+    if (profileBtnImg) {
+    profileBtnImg.src = profile.character;
+  }
+}
+
+// ==========================
+// MAP CONFIG
+// ==========================
+const MAPS = {
+  map1: { image: "map.jpg" },
+  map2: { image: "map2.jpg" },
+  map3: { image: "map3.jpg" }
+};
+
+function getMapForQuest(questId) {
+  const hotspot = document.querySelector(`.hotspot[data-city="${questId}"]`);
+  return hotspot ? hotspot.dataset.map : null;
+}
+
+// ==========================
+// Summative by path menu
+// ==========================
+const pathQuests = {
+  paintersPath: [
+    { title: "Trial of the Modern Masters", id: "quest4", style: "mvp" },
+    { title: "Duel of the Silent Master", id: "quest11", style: "mvp" },
+    { title: "The Beast of the Borderlands", id: "quest35", style: "mvp" },
+    { title: "Chaos Sealed in Color", id: "quest36", style: "mvp" },
+    { title: "Bastions of Light and Stone", id: "quest66", style: "mvp" },
+   
+  ],
+  sketcherPath: [
+    { title: "The Threat of the East", id: "quest30", style: "mvp" },
+    { title: "The Master's Table", id: "quest41", style: "mvp" },
+  ],
+  watercoloursPath: [
+    { title: "The Silent Objects Trial", id: "quest16", style: "mvp" },
+    { title: "Chronicle of Living Stone", id: "quest25", style: "mvp" },
+    { title: "The Elven Vista Trial", id: "quest17", style: "mvp" },
+    { title: "Trial of the Silent Objects", id: "quest22", style: "mvp" },
+    { title: "Legacy of Azure and Verdant Peaks", id: "quest50", style: "mvp" },
+
+    { title: "Duel with Loki, The Trickster", id: "quest27", style: "mvp" },
+  ],
+  "3DPath": [
+    { title: "The face stealer", id: "quest53", style: "mvp" },
+    { title: "The Necklace of the Desert Moon", id: "quest54", style: "mvp" },
+    { title: "The Story Tile of the Hearth", id: "quest56", style: "mvp" },
+    { title: "The Bound Spirit", id: "quest57", style: "mvp" },
+    { title: "The Citadel of Forms", id: "quest58", style: "mvp" },
+    { title: "The Master Forgemaster’s Covenant", id: "quest68", style: "mvp" },
+  ]
+};
+
+// =============================================================
+// HOTSPOT POSITIONING
+// =============================================================
+function initializeHotspotPositions() {
+  // Get all hotspots and store their positions relative to the map
+  document.querySelectorAll(".hotspot").forEach(hotspot => {
+    const id = hotspot.dataset.city;
+    // Store the original position from data attributes or inline styles
+    const left = hotspot.style.left || hotspot.dataset.left;
+    const top = hotspot.style.top || hotspot.dataset.top;
     
-    /* Make it a flex container to center the text */
-    display: flex;
-    align-items: center !important;
-    justify-content: center !important;
+    if (left && top) {
+      hotspotPositions[id] = {
+        left: left,
+        top: top
+      };
+      console.log(`Stored position for ${id}:`, hotspotPositions[id]);
+    }
+  });
+  
+  // If no positions stored, calculate them from current layout
+  if (Object.keys(hotspotPositions).length === 0) {
+    calculateHotspotPositions();
+  }
+}
+
+function calculateHotspotPositions() {
+  const mapImage = document.getElementById("map-image");
+  const mapContainer = document.getElementById("map-container");
+  
+  if (!mapImage || !mapContainer) return;
+  
+  // Wait for map to load
+  if (!mapImage.complete) {
+    mapImage.onload = () => calculateHotspotPositions();
+    return;
+  }
+  
+  const mapRect = mapImage.getBoundingClientRect();
+  const containerRect = mapContainer.getBoundingClientRect();
+  
+  document.querySelectorAll(".hotspot").forEach(hotspot => {
+    const id = hotspot.dataset.city;
+    const rect = hotspot.getBoundingClientRect();
     
-    /* Text styling */
-    color: white !important;
-    font-size: 0.8vw !important; /* Responsive font size */
-    font-weight: bold !important;
-    text-shadow: 1px 1px 2px black !important;
-    text-transform: uppercase !important;
-    letter-spacing: 1px !important;
-}
-
-.gallery-hotspot::after {
-    content: "Gallery";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: white;
-    font-size: inherit;
-    font-weight: inherit;
-    text-shadow: inherit;
-    text-transform: inherit;
-    letter-spacing: inherit;
-    white-space: nowrap;
-}
-
-@keyframes galleryGlow {
-    from {
-        box-shadow: 0 0 10px rgba(247, 255, 4, 0.5),
-                    0 0 20px rgba(189, 245, 4, 0.3),
-                    0 0 30px rgb(1, 73, 255);
-    }
-    to {
-        box-shadow: 0 0 30px rgba(247, 255, 4, 1),
-                    0 0 60px rgba(189, 245, 4, 0.9),
-                    0 0 90px rgb(1, 73, 255);
-    }
-}
-
-/* Pathfinder Hotspot with text */
-.pathfinder-hotspot {
-    position: absolute !important;
-    transform: translate(-50%, -50%) !important;
-    cursor: pointer !important;
-    width: 7% !important; /* Slightly wider for longer text */
-    height: auto !important;
-    min-height: 25px !important;
-    aspect-ratio: 8 / 1 !important;
+    // Calculate position as percentage of map image
+    const leftPercent = ((rect.left + rect.width/2 - mapRect.left) / mapRect.width) * 100;
+    const topPercent = ((rect.top + rect.height/2 - mapRect.top) / mapRect.height) * 100;
     
-    /* Different color scheme for Pathfinder */
-    box-shadow: 0 0 20px rgba(153, 105, 255, 0.9),  /* Hot pink */
-                0 0 40px rgba(43, 101, 226, 0.7),  /* Blue violet */
-                0 0 60px rgba(161, 20, 255, 0.5);  /* Deep pink */
+    hotspotPositions[id] = {
+      left: `${leftPercent}%`,
+      top: `${topPercent}%`
+    };
     
-    border-radius: 20%;
-    animation: pathfinderGlow 1.5s infinite alternate;
+    console.log(`Calculated position for ${id}:`, hotspotPositions[id]);
+  });
+}
+
+function updateHotspotPositions() {
+  const mapImage = document.getElementById("map-image");
+  const mapContainer = document.getElementById("map-container");
+  
+  if (!mapImage || !mapContainer) return;
+  
+  const mapRect = mapImage.getBoundingClientRect();
+  const containerRect = mapContainer.getBoundingClientRect();
+  const mapScale = scale || 1;
+  
+  console.log("Current map:", currentMap); // Debug: see current map
+  
+  document.querySelectorAll(".hotspot").forEach(hotspot => {
+    const id = hotspot.dataset.city;
+    const mapAttr = hotspot.dataset.map; // Get the map attribute
+    const position = hotspotPositions[id];
     
-    /* Flex container to center the text */
-    display: flex;
-    align-items: center !important;
-    justify-content: center !important;
+    console.log(`Hotspot ${id}: data-map="${mapAttr}", currentMap="${currentMap}"`); // Debug
     
-    /* Text styling */
-    color: white !important;
-    font-size: 0.8vw !important;
-    font-weight: bold !important;
-    text-shadow: 1px 1px 2px black !important;
-    text-transform: uppercase !important;
-    letter-spacing: 1px !important;
-    white-space: nowrap;
-}
-
-.pathfinder-hotspot::after {
-    content: "Pathfinder";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: white;
-    font-size: inherit;
-    font-weight: inherit;
-    text-shadow: inherit;
-    text-transform: inherit;
-    letter-spacing: inherit;
-    white-space: nowrap;
-}
-
-@keyframes pathfinderGlow {
-    from {
-        box-shadow: 0 0 10px rgba(133, 105, 255, 0.5),
-                    0 0 20px rgba(138, 43, 226, 0.3),
-                    0 0 30px rgba(255, 20, 147, 0.2);
+    if (position) {
+      // Apply the stored position
+      hotspot.style.left = position.left;
+      hotspot.style.top = position.top;
+      
+      // Scale the hotspot with the map
+      hotspot.style.transform = `translate(-50%, -50%) scale(${mapScale})`;
+      
+      // Check visibility
+      if (id === "gallery" || id === "pathfinder") { 
+        // Gallery should only show on map1
+        hotspot.style.display = currentMap === "map1" ? "block" : "none";
+      } else {
+        // Regular hotspots: show only on their assigned map
+        hotspot.style.display = mapAttr === currentMap ? "block" : "none";
+      }
+      
+      // Adjust z-index
+      hotspot.style.zIndex = "1000";
+    } else {
+      console.log(`No position found for ${id}`);
     }
-    to {
-        box-shadow: 0 0 30px rgb(105, 190, 255),
-                    0 0 60px rgba(138, 43, 226, 0.9),
-                    0 0 90px rgba(55, 20, 255, 0.7);
+  });
+}
+// ==========================
+// LOAD QUESTS JSON & BIND HOTSPOTS
+// ==========================
+document.addEventListener("DOMContentLoaded", () => {
+  updateProfileUI();
+   recalculateAllQuestRewards();
+
+  const container = document.getElementById("map-container");
+
+  fetch("quests.json")
+    .then(res => res.json())
+    .then(data => {
+      quests = data;
+      console.log("Quests loaded:", quests);
+
+      bindHotspots();
+      ensureMVPColumnExists();
+      updateProfileStandardsTable();
+      renderRadarChart();
+      updateProfileUI();
+      
+      // Initialize timers for accepted quests
+      initializeQuestTimers();
+       initializeQuestList(); // Initialize quest list functionality
+
+       // Initialize hotspot positions
+      setTimeout(() => {
+        initializeHotspotPositions();
+        updateHotspotPositions();
+      }, 500); // Wait for map to load
+    })
+    .catch(err => console.error("Failed to load quests.json:", err));
+
+  updateHotspotVisibility();
+
+  const mapSelector = document.getElementById("map-selector");
+  mapSelector?.addEventListener("change", () => {
+    const mapId = mapSelector.value;
+    switchMap(mapId);
+  });
+
+  document.getElementById("path-selector")?.addEventListener("change", handlePathChange);
+  document.getElementById("mvp-quests")?.addEventListener("change", function() {
+    if (this.value) openQuest(this.value);
+    this.style.display = "none";
+  });
+
+  window.addEventListener("wheel", e => {
+    if (!e.ctrlKey) return;
+
+    e.preventDefault();
+
+    const zoomFactor = 0.1;
+    const MIN_SCALE = 1;
+
+    scale += e.deltaY < 0 ? zoomFactor : -zoomFactor;
+
+    if (scale < MIN_SCALE) {
+      scale = MIN_SCALE;
     }
-}
 
-
-/* Debug: show hotspots*/
-.hotspot.debug {
-    background: rgba(224, 50, 50, 0.461);
-}
-
-/* Grid overlay*/
-#map-container::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-image:
-        linear-gradient(to right, rgba(255, 255, 255, 0.402) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(255, 255, 255, 0.402) 1px, transparent 1px);
-    background-size: 10% 10%;
-    pointer-events: none;
-    z-index: 0;
-}
-
-/*=============================
-Dropdown MENU content
-=============================*/
-
-/* Dropdown container at the top left */
-#dropdown-container {
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    background-color: rgba(0,30,180,0.3);
-    padding: 10px;
-    border-radius: 5px;
-    color: white;
-    z-index: 999;  /* Ensure it appears above the map */
-}
-
-/* Style for select elements */
-select {
-    background-color: #0718b18f;
-    color: white;
-    border: none;
-    padding: 5px;
-    margin: 5px;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-select:focus {
-    outline: none;
-}
-
-/* Search engine layout*/
-#quest-search-container {
-    margin-top: 10px;
-    margin-right: 20px;
-    width: 200px;
-}
-#quest-search {
-    width: 100%;
-    padding: 6px 8px;
-    border-radius: 5px;
-    border: none;
-    background: rgb(0, 30, 180, 0.5);
-    color: white;
-    font-size: 14px;
-}
-#quest-search-results {
-    margin-top: 5px;
-    max-height: 240px;
-    overflow-y: auto;
-    background: rgba(0,30,180,0.4);
-    border-radius: 5px;
-}
-.search-result {
-    cursor: pointer;
-    font-size: 15px;
-    border-bottom: 1px solid rgba(255,255,255,0.15);
-}
-.search-result:last-child {
-    border-bottom: none;
-}
-.search-result:hover {
-    background: rgba(100,150,255,0.6);
-}
-.search-result strong {
-    font-size: 13px;
-    color: #cbd6ff;
-    display: block;
-}
-
-.search-result span {
-    font-size: 15px;
-}
-
-/* =======================================
-   Quest Modal
-   ======================================= */
-
-/* Overlay darkening the map */
-#quest-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.4); /* semi-dark background */
-    z-index: 2000;
-    overflow-y: auto;
-    padding: 20px;
-}
-.quest-overlay {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-/* Quest box */
-#quest-box {
-    background-color: rgba(0,30,180,0.3); /* semi-dark blue */
-    color: #fff;
-    border-radius: 10px;
-    padding: 15px;
-    max-width: 900px;
-    margin: auto;
-    box-shadow: 0 0 20px rgba(0,0,0,0.5);
-    display: grid;
-    grid-template-columns: repeat(12, 1fr); /* 12-column grid */
-    grid-auto-rows: min-content;
-    gap: 10px;
-    position: relative;
-}
-/* Close button */
-#close-quest {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    cursor: pointer;
-    font-size: 20px;
-}
-/* Quest rows */
-.quest-row {
-    display: contents; /* children use grid columns */
-}
-/* Quest cells */
-.quest-cell {
-    background-color: rgba(0,30,180,0.3); /* slightly lighter blue boxes */
-    border-radius: 8px;
-    padding: 10px;
-    color: #fff;
-    border:2px solid rgba(100,150,255,0.7) /*light blue border*/
-}
-/*Quest box cells mvp */
-#quest-box.mvp .quest-cell {
-    background-color: rgba(214, 180, 26, 0.521); /* Gold */
-    border-radius: 8px;
-    padding: 10px;
-    color: #fff;
-    border:2px solid gold; /*gold border*/;
-}
-#quest-box.mvp .quest-cell:hover {
-    border-color:rgb(182, 150, 9) !important; 
-       
-}
-/*first row: difficulty aligned right*/
-#quest-box  > .quest-row:nth-of-type(1) .quest-cell:nth-of-type(3) {
-    grid-column: 10 / -1;
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-}
-/*Quest cell glow*/
-.quest-cell:hover  {
-    border-color:rgba(150,200,255,1); /* slightly ligther brighter blue*/
-    box-shadow: 0 0 10px rgba(150,200,255,o.5); /*soft glow*/
-    transition: all 0.3s ease; /*smooth animation*/
-}
-/* Full width cell */
-.quest-cell.full { grid-column: 1 / 6; }
-/*rationale*/
-.rationale-cell {
-   grid-column: 10 / 13;
-    align-items: center;    /* vertical centering */
-    justify-content: center; /* horizontal centering */
-    text-align: center;   
-}
-/* Image, description, requirements */
-#quest-text {
-    text-align: justify;
-    margin: 0%;
-}
-.image-cell { grid-column: 1 / 3; }
-.description-cell { grid-column: 3 / 8; }
-
-/*line 4)*/
-.quest-cell.rubric-cell {
-    display: flex;
-    text-align: center;
-    align-items: center;
-    justify-content: center;
-}
-.requirements-cell { grid-column: 8 / 13; }
-#quest-requirements {
-    text-align: justify;
-    margin: 0%;
-}
-/* Ensure prerequisites have bullets and padding */
-#quest-overlay #quest-prereq-leads-prereq {
-    list-style-type: disc; /* Bullet points */
-    padding-left: 40px; /* Indent bullets */
-    margin: 5;
-}
-/* Ensure individual list items are spaced out */
-#quest-overlay #quest-prereq-leads-prereq li {
-    margin-bottom: 10px; /* Space between list items */
-}
-/* Style for checked prerequisites */
-#quest-overlay .prereq-check {
-    margin-left: 10px;
-}
-/* Second row: Links + Rewards */
-.quest-row:nth-of-type(4) {
-    grid-column: 1 / -1; /* Full width */
-    display: grid;
-    grid-template-columns: 1fr 1fr; /* Two columns: Links + Reward */
-    gap: 10px;
-}
-.links-cell { grid-column: 1 / 5;}
-.work-cell {grid-column: 5 / 8;
-    display: flex;
-    text-align: center;
-    align-items: center;}
-.reward-cell {
-  grid-column: 8 / 13;
-  display: flex;
-  flex-direction: column;       /* stack label + value row */
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  font-size: clamp(17px, 4vw, 20px);
-
-/* VALUE + ICON INLINE */
-.reward-cell p {
-  display: flex;
-  align-items: center;
-  gap: 6px;                     /* space between number and icon */
-  margin: 0;
-}
-.reward-cell strong:last-child {
-  margin-left: 6px;
-}
-
-}/* Stars */
-.stars {
-    display: inline-flex;
-    gap: 2px;
-}
-.star.solid { color: gold; }
-.star.outline { color: transparent; -webkit-text-stroke: 1px gold; }
-/* Images in quest box */
-#quest-character {
-    width: 100%;
-    height: auto;
-    border-radius: 8px;
-}
-/*default quest box (blue)*/
-#quest-box {
-    background-color: rgb(0, 30, 180, 0.3);
-    border-radius: 10px;
-    border: 2px solid transparent;
-}
-/*MVP/Summaitve quests box colour*/
-#quest-box.mvp {
-    background-color: rgba(255, 208, 0, 0.2);
-}
-/*Inner cells for MVP*/
-#quest-box.mvp .quest-cell {
-    background-color: rgba(255, 165, 45, 0.2);
-    border: 1px solid gold;
-}
-/* Links inside quest box */
-#quest-box a {
-    color: white; /* Change link text color to white */
-    text-decoration: none; /* Optional: removes underline */
-}
-#quest-box a:hover {
-    color: #ccc; /* Light grey when hovering, you can adjust this to any color */
-}
-/* Completed quest box (blue or MVP → gray) */
-#quest-box.completed {
-    background-color: rgba(0, 0, 0, 0.4); /* Gray background */
-    border-color: silver; /* Silver border for completed quests */
-    box-shadow: 0 0 10px rgba(150,200,255,o.5); /*soft glow*/
-}
-#quest-box.completed .quest-cell {
-    background-color: rgba(0, 0, 0, 0.4); /* Lighter gray for inner cells */
-    border-color: silver; /* Silver border for cells */
-    box-shadow: 0 0 10px rgba(150,200,255,o.5); /*soft glow*/
-}
-#quest-box.completed .quest-cell:hover{
-    border-color: rgba(182, 182, 182, 0.4);
-}
-/* Base styles for tab buttons */
-.tab-button {
-    padding: 10px;
-    cursor: pointer;
-    background-color: rgba(247, 247, 247, 0.4); /* Light background for inactive tabs */
-    border: 1px solid #ccc; /* Light border */
-    border-radius: 5px;
-    transition: background-color 0.3s ease;
-}
-/* Active tab styles */
-.tab-button.active {
-    background-color: rgba(0, 0, 0, 0.315); /* Active tab color */
-    color: white; /* White text for active tab */
-    border: 1px solid #000000; /* Border color matching the active background */
-}
-/* Optional: Hover effect for inactive tabs */
-.tab-button:hover {
-    background-color: rgba(182, 182, 182, 0.4);
-}
-/* MVP Hotspot glow*/
-
-.mvp-hotspot {
-    box-shadow: 10px 10px 10px rgba(0, 0, 0, 0.9);
-    border-radius: 0%;
-    animation: mvpGlow 0.5s infinite alternate;
-}
-@keyframes mvpGlow {
-    from {
-       box-shadow: 0 0 10px rgba(247, 255, 4, 0.5),
-                    0 0 20px rgba(189, 245, 4, 0.3),
-                    0 0 30px rgb(255, 1, 1);
+    if (container) {
+      container.style.transform = `scale(${scale})`;
+      // Update hotspot positions after zoom
+      setTimeout(updateHotspotPositions, 10);
     }
-    to {
-        box-shadow: 0 0 30px rgba(247, 255, 4, 1),
-                    0 0 60px rgba(189, 245, 4, 0.9),
-                    0 0 90px rgb(255, 1, 1);
+  }, { passive: false });
+
+  function isVisible(el) {
+    return el && getComputedStyle(el).display !== "none";
+  }
+// CLOSE TABS WITH ESC========================================================//
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+
+    const achievementsOverlay = document.getElementById("achievements-overlay");
+    const rationaleOverlay = document.getElementById("rationale-overlay");
+    const questOverlay = document.getElementById("quest-overlay");
+    const rubricOverlay = document.getElementById("rubric-overlay");
+    const workOverlay = document.getElementById("work-overlay"); 
+    const modal = document.getElementById("helpModal");
+
+    if (isVisible(achievementsOverlay)) {
+      achievementsOverlay.style.display = "none";
+      return;
     }
-}
 
-/* WELLCOME==========================================================================================*/
-.welcome-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  display: none;
-  justify-content: center;
-  align-items: center;
-  background: rgba(0,0,0,0.7);
-  z-index: 9999;
-}
-/* Scroll wrapper */
-.welcome-scroll {
-  position: relative;
-  width: 85%;
-  max-width: 900px;
-  height: 80vh;
-  background: url('scroll.png') center/contain no-repeat;
-
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  will-change: transform, opacity;
-
-  padding: 80px 60px;
-  box-shadow: 0 25px 60px rgba(0,0,0,0.7);
-  animation: float 5s ease-in-out infinite;
-}
-/* Body content */
-.scroll-body {
-  width: 100%;
-  max-width: 680px;
-  text-align: center;
-  color: #000000;
-  font-family: 'Georgia', serif;
-  z-index: 2;
-
-  /* AUTO FIT TEXT */
-  font-size: clamp(16px, 2.2vw, 20px);
-
-  /* SCROLL IF TOO LONG */
-  max-height: 60vh;
-  overflow-y: auto;
-  padding-right: 10px;
-}
-/* Scrollbar styling */
-.scroll-body::-webkit-scrollbar {
-  width: 8px;
-}
-.scroll-body::-webkit-scrollbar-thumb {
-  background: rgba(125, 84, 35, 0.705);
-  border-radius: 10px;
-}
-/* Float animation */
-@keyframes float {
-  0% { transform: translateY(-4px); }
-  50% { transform: translateY(4px); }
-  100% { transform: translateY(-4px); }
-}
-/* Text */
-.welcome-scroll h1 {
-  font-size: clamp(26px, 4vw, 42px);
-  margin-bottom: 20px;
-}
-.welcome-scroll p {
-  font-size: clamp(14px, 1.6vw, 18px);
-  line-height: 1.6;
-  margin-bottom: 20px;
-}
-/* Button */
-#welcome-close {
-  padding: 12px 28px;
-  font-size: 18px;
-  border: 2px solid #7b5a2b;
-  background: #f0d9a7;
-  cursor: pointer;
-  border-radius: 10px;
-}
-/*character choosing*/
-#characters-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 15px;
-}
-.character-card {
-  cursor: pointer;
-  border: 2px solid rgba(255,255,255,0.3);
-  padding: 6px;
-  border-radius: 12px;
-}
-.character-card img {
-  width: 90px;
-  height: 90px;
-  object-fit: contain;
-}
-/* ==========================
-   RUBRIC POPUP (Quest-style)
-   ========================== */
-#rubric-overlay {
-  z-index: 2500; /* above quest (2000), below rationale (10000) */
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.7);
-  justify-content: center;
-  align-items: center;
-}
-
-.rubric-box {
-  position: relative;
-  max-width: 1000px;
-  max-height: 80vh;
-  overflow-y: auto;
-  background-color: rgba(0,30,180,0.3); /* semi-dark blue */
-  color: #fff;
-  border-radius: 10px;
-  padding: 15px;
-  box-shadow: 0 0 20px rgba(0,0,0,0.5);
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  grid-auto-rows: min-content;
-  gap: 10px;
-  margin: auto;
-}
-
-#rubric-title {
-  grid-column: 1 / -1;
-  text-align: center;
-  margin: 0;
-  padding: 10px 0;
-  font-size: 26px;
-  font-weight: bold;
-  color: #fff;
-  background: rgba(0,30,180,0.25);
-}
-
-/* Rubric content */
-#rubric-content {
-  grid-column: 1 / -1;
-  background: rgba(0,30,180,0.25);
-  border: 2px solid rgba(100,150,255,0.7);
-  border-radius: 8px;
-  padding: 15px;
-}
-
-/* Optional: hover glow like quest cells */
-#rubric-content:hover {
-  border-color: rgba(150,200,255,1);
-  box-shadow: 0 0 10px rgba(150,200,255,0.5);
-  transition: all 0.3s ease;
-}
-.rubric-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 0px;
-  
-}
-
-.rubric-table th,
-.rubric-table td {
-  border: 2px solid rgba(100,150,255,0.7);
-  padding: 10px;
-  background: rgba(0,30,180,0.2);
-  color: white;
-  text-align: left;
-}
-
-.rubric-table th {
-  background: rgba(0,30,180,0.35);
-  border: 20px;
-}
-
-.rubric-table tr:hover td {
-  border-color: rgba(150,200,255,1);
-  box-shadow: 0 0 10px rgba(150,200,255,0.5);
-}
-/* Close button inside rubric box */
-#rubric-overlay .close-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  font-size: 24px;
-  color: white;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  z-index: 10;
-}
-.rubric-table td.highlight {
-  background-color: rgba(201, 175, 29, 0.726) !important;
-  color: #000 !important;
-}
-/* Parchment animation */
-
-@keyframes unroll {
-  0% {
-    transform: scaleY(0.05) translateY(-40px);
-    opacity: 0;
-    filter: blur(3px);
-  }
-  60% {
-    transform: scaleY(1.05) translateY(10px);
-    opacity: 1;
-    filter: blur(0.5px);
-  }
-  100% {
-    transform: scaleY(1) translateY(0);
-    opacity: 1;
-    filter: blur(0);
-  }
-}
-
-@keyframes float {
-  0% { transform: translateY(-4px); }
-  50% { transform: translateY(4px); }
-  100% { transform: translateY(-4px); }
-}
-
-/* Scroll animation */
-.welcome-scroll,
-.rationale-scroll {
-  position: relative;
-  transform-origin: top center;
-  animation: float 5s ease-in-out infinite;
-}
-
-/* Stop text shimmer */
-.welcome-scroll * ,
-.rationale-scroll * {
-  animation: none !important;
-  transform: none !important;
-}
-
-/* Apply unroll to both popups */
-.welcome-overlay[style*="display: flex"] .welcome-scroll,
-.rationale-overlay[style*="display: flex"] .rationale-scroll {
-  animation:
-    unroll 0.9s ease-out,
-    float 5s ease-in-out infinite 0.9s;
-}
-/*PROFILE=========================================================================================*/
-/* PROFILE BUTTON */
-.profile-btn {
-  position: fixed;
-  top: 25px;
-  right: 20px;
-  width: auto !important; /* Let it size based on image */
-  height: auto !important;
-  border: none;
-  cursor: pointer;
-  background: transparent !important;
-  padding: 0;
-  margin: 0;
-/*  box-shadow: 0 4px 10px rgba(0,0,0,0.25); - square around the button*/
-}
-
-.profile-btn img {
-  width: 80px; /* Set your desired size here */
-  height: 80px;
-  object-fit: contain;
-  display: block;
-  border-radius: 0; /* Remove any rounding */
-}
-
-
-/* OVERLAY (same as quest) */
-.overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: rgba(0,0,0,0.65);
-  z-index: 1000;
-}
-
-/* POPUP (match quest style) */
-.popup {
-  width: 85%;
-  max-width: 1100px;
-  background: rgba(0,30,180,0.3);
-  border: 3px solid #5b4b3a;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.25);
-  position: relative;
-}
-
-/* CLOSE BUTTON */
-.close-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  border: none;
-  background: transparent;
-  font-size: 28px;
-  cursor: pointer;
-  color: white;
-}
-.profile-title {
-  text-align: center;
-  font-size: 24px;
-  font-weight: 700;
-  color: #fff;
-  margin: 15px 0;
-}
-
-/* GRID */
-.profile-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 24px;
-  align-items: center;
-}
-
-/* LEFT COLUMN */
-.profile-left {
-  text-align: center;
-}
-.student-profile {
-  display: flex;
-  flex-direction: column;   /* stack vertically */
-  align-items: center;      /* center horizontally */
-  text-align: center;
-}
-.profile-left {
-  display: flex;
-  flex-direction: column;   /* stack avatar + name */
-  align-items: center;      /* center horizontally */
-  text-align: center;
-}
-
-.student-avatar {
-  width: 120px;
-  height: 120px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.student-avatar img {
-  max-width: 100%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-}
-
-
-.student-name {
-  margin-top: 10px;
-  font-size: 22px;
-  font-weight: bold;
-  color: white;
-}
-
-/* CENTER COLUMN */
-.radar-wrapper {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-/* RIGHT COLUMN */
-.profile-right {
-  font-size: 16px;
-  text-align: center;
-  color: white;
-}
-
-.profile-right ul {
-  list-style: none;
-  padding: 0;
-}
-
-.profile-right li {
-  margin: 8px 0;
-}
-/* Table Styles */
-#standards-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 20px;
-  background-color: rgba(0, 30, 180, 0.3); /* semi-dark blue */
-  color: #fff;
-  border-radius: 30px;
-  border:2px solid rgba(100,150,255,0.7); /*light blue border*/
-  padding: 50px;
-  max-width: 900px;
-  margin: auto;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-}
-
-#standards-table th,
-#standards-table td {
-  padding: 8px;
-  text-align: center;
-  border-bottom: 1px solid rgba(100,150,255,0.7);
-}
-
-#standards-table th {
-  background-color: rgba(0, 30, 180, 0.5); /* darker blue for header */
-  border-radius: 10px;
-}
-
-#standards-table td {
-  font-size: 14px;
-}
-
-#standards-table tr:hover {
-  background-color: rgba(0, 30, 180, 0.5); /* highlight rows when hovering */
-}
-.radar-tooltip {
-  background: white;
-  color:#000000;
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 13px;
-  white-space: nowrap;
-}
-#radar-tooltip {
-  position: absolute;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-#radar-chart-container {
-  position: relative;
-}
-/* ============================================
-   PROFILE ACTION BUTTONS (Under Name)
-   ============================================ */
-.profile-action-buttons {
-  display: flex;
-  gap: 10px;
-  margin-top: 15px;
-  justify-content: center;
-  width: 100%;
-}
-.profile-btn-small {
-  padding: 8px 8px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-family: 'Times New Roman', serif;
-  font-size: 0.9em;
-  font-weight: bold;
-  text-align: center;
-  transition: all 0.2s ease;
-  flex: 1;
-  min-width: 80px;
-  max-width: 100px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
-  position: relative;
-  overflow: hidden;
-  color: #fff;
-}
-.profile-btn-small::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(255, 255, 255, 0.1);
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-.profile-btn-small:hover::before {
-  opacity: 1;
-}
-.save-btn {
-  background: rgba(0, 30, 180, 0.342);
-  border: 1px solid rgba(100, 150, 255, 0.7);
-}
-.save-btn:hover {
-  background: linear-gradient(to bottom, rgba(40, 110, 210, 0.9), rgba(30, 80, 190, 0.9));
-  transform: translateY(-1px);
-  box-shadow: 0 3px 6px rgba(0, 30, 180, 0.4);
-  border-color: rgba(120, 170, 255, 0.9);
-}
-.load-btn {
-  background: rgba(0, 30, 180, 0.5);
-  border: 1px solid rgba(100, 150, 255, 0.7);
-  position: relative;
-}
-.load-btn:hover {
-  background: linear-gradient(to bottom, rgba(40, 110, 210, 0.8), rgba(30, 80, 190, 0.8));
-  transform: translateY(-1px);
-  box-shadow: 0 3px 6px rgba(0, 30, 180, 0.4);
-  border-color: rgba(120, 170, 255, 0.9);
-}
-.file-input-hidden {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
-  opacity: 0;
-  cursor: pointer;
-  z-index: 2;
-}
-/* Save success animation */
-@keyframes quickPulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.08); }
-  100% { transform: scale(1); }
-}
-.save-success {
-  animation: quickPulse 0.3s ease;
-}
-/* Tooltip for buttons */
-.profile-btn-small {
-  position: relative;
-}
-.profile-btn-small:hover::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.8);
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.8em;
-  white-space: nowrap;
-  z-index: 1000;
-  pointer-events: none;
-}
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .profile-action-buttons {
-    gap: 8px;
-    margin-top: 12px;
-  }
-  
-  .profile-btn-small {
-    padding: 6px 12px;
-    font-size: 0.85em;
-    min-width: 70px;
-  }
-}
-/* Ensure the left column has proper spacing */
-.profile-left {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 1px;
-}
-.student-name {
-  font-size: 1.2em;
-  font-weight: bold;
-  color: #fff;
-  text-align: center;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-  margin-bottom: 5px;
-}
-#characters-list img {
-  width: 80px;
-  margin: 5px;
-  border: 2px solid transparent;
-  border-radius: 10px;
-}
-#characters-list img:hover {
-  border-color: gold;
-}
-#student-avatar {
-  width: 120px;       /* smaller size */
-  height: auto;       /* keep aspect ratio */
-  max-height: 120px;  /* prevent too tall images */
-  object-fit: contain; /* prevent distortion */
-  border-radius: 10px;
-}
-.avatar-wrapper {
-  position: relative;
-  display: inline-block;
-}
-.avatar-wrapper img {
-  width: 120px;
-  height: auto;
-  max-height: 120px;
-  object-fit: contain;
-  border-radius: 10px;
-}
-.avatar-gear {
-  position: absolute;
-  top: 0;
-  left: 0;
-  transform: translate(-30%, -30%);
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255,255,255,0.8);
-  cursor: pointer;
-  font-size: 18px;
-}
-.hide-setup-text .welcome-scroll h1,
-.hide-setup-text .welcome-scroll p {
-  display: none;
-}
-/*REWARD INSIDE PROFILE*/
-.money-amount {
-  display: inline-block;
-  background: rgba(42, 16, 190, 0.2);
-  border-radius: 5px;
-  padding: 4px 1px;
-  font-size: 24px;
-  font-weight: bold;
-  color: #ffffff; 
-  text-align: center;
-  min-width: 80px;
-  margin-left: 10px;
-}
-.money-icon {
-  font-size: 28px;
-  vertical-align: center;
-  color: white;
-}
-.profile-money {
-  margin-top: 5px;
-  text-align: center;
-}
-.money-link {
-    color: white !important;
-}
-/* Deduct rewards button styling */
-.deduct-btn {
-    background: rgba(42, 16, 190, 0.2);
-    color: white;
-    border: 2px solid #19b7d3;
-    border-radius: 8px;
-    padding: 8px 15px;
-    margin-top: 10px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: bold;
-    transition: all 0.3s;
-    width: 100%;
-    text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-}
-.deduct-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 8px rgba(0,0,0,0.3);
-}
-.deduct-btn:active {
-    transform: translateY(0);
-}
-.deduct-btn:disabled {
-    background: #666;
-    cursor: not-allowed;
-    opacity: 0.6;
-}
-/*=RATIONALE================================================================================ */
-.rationale-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.75);
-  display: none;
-  justify-content: center;
-  align-items: center;
-  z-index: 10000;
-}
-/* Scroll body */
-.rationale-scroll {
-  background: #f5e1b0;
-  border: 6px solid #b99b63;
-  border-radius: 20px;
-  max-width: 900px;
-  width: 85%;
-  max-height: 85vh;
-  padding: 60px 70px;
-  box-shadow: 0 30px 80px rgba(0,0,0,0.8);
-  color: #3d2a1b;
-  font-family: 'Georgia', serif;
-  position: relative;
-  overflow-y: auto;
-}
-/* Title */
-.rationale-scroll h1 {
-  text-align: center;
-  font-size: 80px;
-  margin-bottom: 0px;
-}
-/* Close button */
-#rationale-close {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  background: none;
-  border: none;
-  font-size: 28px;
-  cursor: pointer;
-  color: #5b3c1c;
-}
-/* Mobile */
-@media (max-width: 600px) {
-  .rationale-scroll {
-    padding: 40px 30px;
-  }
-  .rationale-scroll h1 {
-    font-size: 26px;
-  }
-}
-/*ACHIEVEMENTS==================================================================================*/
-/* Achievements Button */
-.achievements-btn {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  padding: 14px 18px;
-  font-size: 16px;
-  border-radius: 12px;
-  background: rgba(0,30,180,0.3);
-  color: white;
-  cursor: pointer;
-  z-index: 1000;
-}
-/* Achievements overlay */
-#achievements-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    justify-content: center;
-    align-items: center;
-    z-index: 9999;
-    padding: 20px;
-}
-/* Achievements container - */
-   #achievements-overlay .quest-box {
-    background-color: rgba(0,30,180,0.3);
-    color: #fff;
-    border-radius: 10px;
-    padding: 15px;
-    max-width: 900px;
-    width: 100%;
-    margin: auto;
-    box-shadow: 0 0 20px rgba(0,0,0,0.5);
-    display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    grid-auto-rows: min-content;
-    gap: 10px;
-    position: relative;
-}
-/* Close Button */
-#achievements-overlay .close-btn {
-  position: absolute;
-  top: 18px;
-  right: 18px;
-  font-size: 24px;
-  cursor: pointer;
-  color: #fff;
-}
-/* Tabs (same as quest header) */
-#achievements-overlay .achievements-tabs {
-  grid-column: 1 / -1;
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  margin-bottom: 0;
-}
-/* Tab buttons */
-#achievements-overlay .tab-button {
-  padding: 10px 16px;
-  border: 2px solid rgba(255,255,255,0.25);
-  background: rgba(255,255,255,0.08);
-  color: #fff;
-  cursor: pointer;
-  border-radius: 8px;
-}
-#achievements-overlay .tab-button.active {
-  background: rgba(255,255,255,0.15);
-}
-/* TAB CONTENT */
-#achievements-overlay .tab-content {
-  grid-column: 1 / -1;
-  width: 100%;
-
-}
-/* Completed quests grid */
-#achievements-overlay .completed-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-top: 10px;
-  max-height: none;
-  height: auto;
-}
-/* Path column style*/
-#achievements-overlay .completed-grid > div {
-  border: 2px solid rgba(150,200,255,1);
-  padding: 12px;
-  border-radius: 10px;
-  max-height: 70%;
-  overflow: auto;
-}
-
-#achievements-overlay .completed-grid > div::-webkit-scrollbar {
-    width: 8px;
-}
-
-#achievements-overlay .completed-grid > div::-webkit-scrollbar-thumb {
-    background: rgba(100, 150, 255, 0.5);
-    border-radius: 4px;
-}
-
-#achievements-overlay .completed-grid > div::-webkit-scrollbar-track {
-    background: rgba(0, 30, 180, 0.1);
-}
-/* Path title */
-#achievements-overlay .completed-grid h3 {
-  margin-top: 0;
-  margin-bottom: 10px;
-  text-align: center;
-  font-size: 16px;
-  font-weight: bold;
-  color: #fff;
-}
-/* Quest links inside columns */
-#achievements-overlay .completed-grid a {
-  display: block;
-  padding: 10px;
-  margin-bottom: 8px;
-  border-radius: 8px;
-  border: 2px solid rgba(255,255,255,0.2);
-  background: rgba(0,0,0,0.15);
-  color: #fff;
-  text-decoration: none;
-}
-/* Hover effect like quest cells */
-#achievements-overlay .completed-grid a:hover {
-  border-color: rgba(150,200,255,1);
-  background: rgba(0,0,0,0.25);
-}
-/* Achievements accordion style */
-.achievement-item {
-  border: 2px solid rgba(255,255,255,0.25);
-  padding: 10px;
-  margin-bottom: 10px;
-  background: rgba(0,0,0,0.25);
-  border-radius: 8px;
-}
-.achievement-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-#achievements-list a {
-  color: white !important;
-  text-decoration: none;
-}
-#achievements-list a:hover {
-  color: #ddd !important;
-}
-.achievement-quests {
-  display: none;
-  list-style: none;
-  padding-left: 0;
-  margin-top: 10px;
-}
-/* Achievements list*/
-#achievements-list {
-    max-height: 80vh;
-    overflow-y: auto;
-    padding-right: 8px;
-}
-
-/* Custom scrollbar for achievements list (match your theme) */
-#achievements-list::-webkit-scrollbar {
-    width: 8px;
-}
-
-#achievements-list::-webkit-scrollbar-thumb {
-    background: rgba(100, 150, 255, 0.5);
-    border-radius: 4px;
-}
-
-#achievements-list::-webkit-scrollbar-track {
-    background: rgba(0, 30, 180, 0.1);
-}
-/*_______________________________________________________________________*/
-.achievement-item.expanded .achievement-quests {
-  display: block;
-}
-.ach-check {
-  color: white;
-  margin-left: 10px; /* checkmark AFTER the title */
-}
-.achievement-expand {
-  border: none;
-  background: transparent;
-  font-size: 18px;
-  cursor: pointer;
-  color: white;
-}
-/* Keep header as a single row */
-.achievement-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-/* Note styling */
-.achievement-note {
-  font-size: 0.95em;
-  opacity: 0.8;
-  font-style: italic;
-  margin-top: 6px;
-  display: none;
-  color:aquamarine;
-}
-/* Show note only when expanded */
-.achievement-item.expanded .achievement-note {
-  display: block;
-}
-/* ==========================
-   TIMER VISUAL EFFECTS
-========================== */
-/* 30% time left - GLOWING RED PULSE */
-#quest-box.warning {
-    animation: redWarningPulse 1.5s ease-in-out infinite;
-    position: relative;
-}
-@keyframes redWarningPulse {
-    0% {
-        background: rgba(30, 80, 160, 0.9); /* your normal blue */
-        box-shadow: 0 0 20px rgba(255, 0, 0, 0.3);
-        border-color: rgba(255, 100, 100, 0.8);
+    if (isVisible(rationaleOverlay)) {
+      rationaleOverlay.style.display = "none";
+      return;
     }
-    50% {
-        background: rgba(139, 0, 0, 0.8); /* deep red pulse */
-        box-shadow: 0 0 40px rgba(255, 0, 0, 0.7);
-        border-color: rgba(255, 50, 50, 1);
+
+    if (isVisible(modal)) {
+   if (typeof window.closeHelpModal === 'function') {
+      window.closeHelpModal();
+    } else {
+      // Fallback if function doesn't exist
+      modal.style.display = "none";
     }
-    100% {
-        background: rgba(30, 80, 160, 0.9);
-        box-shadow: 0 0 20px rgba(255, 0, 0, 0.3);
-        border-color: rgba(255, 100, 100, 0.8);
+    return;
     }
-}
-/* Time's up - FULL SOLID RED */
-#quest-box.times-up {
-    background: rgba(139, 0, 0, 0.9) !important;
-    border-color: #ff0000 !important;
-    box-shadow: 0 0 50px rgba(255, 0, 0, 0.8) !important;
-}
-/* For MVP quests - overlay gold with red effects */
-#quest-box.mvp.warning {
-    animation: mvpWarningPulse 1.5s ease-in-out infinite;
-}
-@keyframes mvpWarningPulse {
-    0% {
-        box-shadow: 0 0 20px rgba(255, 215, 0, 0.5), 0 0 20px rgba(255, 0, 0, 0.3);
-        border-color: rgba(255, 215, 0, 0.8);
+
+    if (isVisible(workOverlay)) {
+    closeWorkOverlay();
+    return;
     }
-    50% {
-        box-shadow: 0 0 40px rgba(255, 215, 0, 0.7), 0 0 40px rgba(255, 0, 0, 0.7);
-        border-color: rgba(255, 100, 100, 1);
+
+    if (isVisible(rubricOverlay)) {
+      rubricLocked[currentQuestId] = true;
+      saveRubricLocks();
+      teacherMode = false;
+      // UPDATE REWARD WHEN ESCAPING FROM RUBRIC
+      const rewardCoins = calculateQuestRewardCoins(currentQuestId);
+      const rewardEl = document.getElementById("quest-reward");
+      if (rewardEl) {
+        rewardEl.innerHTML = rewardCoins ? `<strong>${rewardCoins} 💰</strong>` : "—";
+      }
+      updateProfileRewards();
+          rubricOverlay.style.display = "none";
+          questOverlay.style.display = "block";
+          return;
+        }
+
+    if (isVisible(questOverlay)) {
+      closeQuest();
+      return;
     }
-    100% {
-        box-shadow: 0 0 20px rgba(255, 215, 0, 0.5), 0 0 20px rgba(255, 0, 0, 0.3);
-        border-color: rgba(255, 215, 0, 0.8);
+  });
+
+  document.querySelectorAll(".tab-button").forEach(button => {
+    button.addEventListener("click", () => {
+      const tab = button.dataset.tab;
+      document.querySelectorAll(".tab-content").forEach(tc => tc.style.display = "none");
+      document.querySelectorAll(".tab-button").forEach(b => b.classList.remove("active"));
+
+      const tabEl = document.getElementById("tab-" + tab);
+      if (tabEl) tabEl.style.display = "block";
+      button.classList.add("active");
+    });
+  });
+
+  // ==========================
+  // STUDENT SETUP (NAME + CHARACTER)
+  // ==========================
+  initializeStudentSetup();
+  setTimeout(() => {
+    initializeWorkOverlay();
+  }, 500);
+});
+
+// ==========================
+// BIND HOTSPOTS
+// ==========================
+function bindHotspots() {
+  document.querySelectorAll(".hotspot").forEach(hotspot => {
+    const cityId = hotspot.dataset.city;
+    
+    // Special handling for pathfinder hotspot
+    if (cityId === "pathfinder") {
+      hotspot.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Open achievements overlay and switch to pathfinder tab
+        const achievementsOverlay = document.getElementById("achievements-overlay");
+        if (achievementsOverlay) {
+          achievementsOverlay.style.display = "flex";
+          
+          // Find and click the pathfinder tab
+          const pathfinderTab = document.querySelector('.tab-button[data-tab="pathfinder"]');
+          if (pathfinderTab) {
+            pathfinderTab.click();
+          }
+        }
+      });
+    } 
+    // Regular MVP styling for other hotspots
+    else if (quests[cityId]?.style === "mvp") {
+      hotspot.classList.add("mvp-hotspot");
+      hotspot.addEventListener("click", () => {
+        if (MAPS[cityId]) {
+          switchMap(cityId);
+        } else {
+          openQuest(cityId);
+        }
+      });
     }
-}
-#quest-box.mvp.times-up {
-    background: linear-gradient(135deg, rgba(139, 0, 0, 0.9) 0%, rgba(178, 34, 34, 0.9) 100%) !important;
-    border-color: #ff0000 !important;
-    box-shadow: 0 0 50px rgba(255, 0, 0, 0.8) !important;
-}
-/* Timer display styling for warning/expired states */
-#quest-box.warning .timer-display {
-    color: #ff4444;
-    font-weight: bold;
-    animation: timerPulse 1s infinite;
-}
-#quest-box.times-up .timer-display {
-    color: #ff0000;
-    font-weight: bold;
-    animation: timerFlash 0.5s infinite alternate;
-}
-@keyframes timerPulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-}
-@keyframes timerFlash {
-    0% { opacity: 1; }
-    100% { opacity: 0.5; }
-}
-/* COMPLETED QUEST OVERRIDES - must override timer states */
-#quest-box.completed {
-    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%) !important;
-    border: 4px solid #666 !important;
-    box-shadow: 0 0 30px rgba(0, 0, 0, 0.8) !important;
-    animation: none !important;
-    color: #ddd !important;
-}
-/* Override warning state when completed */
-#quest-box.completed.warning,
-#quest-box.completed.times-up {
-    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%) !important;
-    border: 4px solid #666 !important;
-    box-shadow: 0 0 30px rgba(0, 0, 0, 0.8) !important;
-    animation: none !important;
-}
-/* Override for MVP completed quests */
-#quest-box.mvp.completed {
-    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%) !important;
-    border: 4px solid #666 !important;
-    box-shadow: 0 0 30px rgba(0, 0, 0, 0.8) !important;
-    animation: none !important;
-    color: #ddd !important;
-}
-/* Timer checkbox styling for completed quests */
-#quest-box.completed .timer-checkbox-label {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-#quest-box.completed .timer-checkbox {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-#quest-box.completed .timer-display {
-    color: #888 !important;
-    animation: none !important;
-}
-/* ==========================
-   QUEST HEADER – SINGLE LINE
-   ========================== */
-/* Force FIRST quest row to be a real grid row */
-#quest-box > .quest-row:first-child {
-    display: grid;
-    grid-template-columns: 5fr 2fr 2fr 3fr;
-    grid-column: 1 / -1;
-    align-items: center;
-    gap: 10px;
-}
-/* Remove old column rules ONLY for first row */
-#quest-box > .quest-row:first-child .quest-cell {
-    grid-column: auto !important;
-    white-space: nowrap;
-    padding: 6px 8px;
-    font-size: 14px;
-}
-/* =================================================
-   QUEST HEADER – CUSTOM 2-LINE LAYOUT
-   ================================================= */
-/* ROW 1: Path | Completed | Difficulty */
-#quest-box > .quest-row:nth-of-type(1) {
-    display: grid;
-    grid-template-columns: 6fr 2fr 2fr;
-    grid-column: 1 / -1;
-    gap: 10px;
-    align-items: center;
-}
-/* ROW 2: Title | Time | Rationale */
-#quest-box > .quest-row:nth-of-type(2) {
-    display: grid;
-    grid-template-columns: 6fr 2fr 2fr;
-    grid-column: 1 / -1;
-    gap: 10px;
-    align-items: center;
-}
-/* Prevent wrapping in header rows */
-#quest-box > .quest-row:nth-of-type(1) .quest-cell,
-#quest-box > .quest-row:nth-of-type(2) .quest-cell {
-    grid-column: auto !important;
-    white-space: nowrap;
-    padding: 6px 8px;
-    font-size: 14px;
-}
-/* Difficulty + stars never wrap */
-.stars,
-.quest-difficulty {
-    white-space: nowrap;
-}
-/* Time cell styling */
-.timer-cell {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-}
-/* Timer display styling */
-.timer-display {
-    font-weight: bold;
-    font-size: 14px;
-}
-/* Rationale button centered */
-.rationale-cell {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-
-}
-/*WELCOME TOUR===========================================================================================*/
-/* Welcome Tour Styles - Integrated into map */
-#welcome-tour-container {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 9998; /* Above map but below overlays */
-  pointer-events: none; /* Allow clicking through to map */
-}
-#welcome-tour-image-wrapper {
-  position: absolute;
-  z-index: 9999;
-  pointer-events: none;
-  transition: all 0.2s ease-in-out;
-}
-#welcome-tour-image {
-  max-width: 1000px;
-  max-height: 800px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0);
-  pointer-events: none;
-}
-#welcome-tour-talk-bubble {
-  position: fixed;
-  background: rgba(35, 121, 14, 0.911);
-  color: white;
-  padding: 30px;
-  border-radius: 100px;
-  max-width: 500px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  z-index: 10000;
-  pointer-events: auto;
-  transition: all 0.2s ease-in-out;
-  font-family: 'Georgia', serif;
-}
-#welcome-tour-talk-bubble:after {
-  content: '';
-  position: absolute;
-  border-width: 15px;
-  border-style: solid;
-  
-}
-#welcome-tour-text {
-  font-size: 18px;
-  margin-bottom: 10px;
-  line-height: 1.5;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-  text-align: center;
-}
-#welcome-tour-counter {
-  font-size: 14px;
-  opacity: 0.8;
-  font-style: italic;
-  margin-bottom: 15px;
-}
-#welcome-tour-controls {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-#welcome-tour-controls button {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(240, 240, 240, 0.9));
-  color: #8B4513;
-  border: 2px solid #8B4513;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-family: 'Georgia', serif;
-  min-width: 100px;
-  font-weight: bold;
-}
-#welcome-tour-controls button:hover {
-  background: linear-gradient(135deg, #8B4513, #A0522D);
-  color: white;
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-}
-#welcome-tour-controls button:active {
-  transform: translateY(0);
-}
-#welcome-tour-finish {
-  background: linear-gradient(135deg, #228B22, #32CD32) !important;
-  color: white !important;
-  border-color: #228B22 !important;
-}
-#welcome-tour-skip {
-  background: linear-gradient(135deg, #B22222, #DC143C) !important;
-  color: white !important;
-  border-color: #B22222 !important;
-}
-/* Highlight elements being explained */
-.tour-highlight {
-  animation: pulse .2s infinite;
-  border-radius: 2px;
-  position: relative;
-  z-index: 9997;
-}
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 4px rgb(255, 0, 212); }
-  50% { box-shadow: 0 0 0 8px rgba(255, 196, 0, 0.753); }
-  100% { box-shadow: 0 0 0 4px rgba(60, 255, 1, 0.5); }
-}
-/* Add to your CSS */
-.tour-active {
-  pointer-events: none !important;
-  cursor: not-allowed !important;
-}
-.tour-active * {
-  pointer-events: none !important;
-  cursor: not-allowed !important;
-}
-/* Allow tour elements to be clickable */
-#welcome-tour-container,
-#welcome-tour-container *,
-#welcome-tour-talk-bubble,
-#welcome-tour-talk-bubble *,
-#welcome-tour-controls,
-#welcome-tour-controls *,
-#welcome-tour-prev,
-#welcome-tour-next,
-#welcome-tour-skip,
-#welcome-tour-finish {
-  pointer-events: auto !important;
-  cursor: pointer !important;
-}
-.tour-btn {
-  display: block;
-  width: 30%;
-  margin-top: 15px;
-  padding: 10px 15px;
-  background: rgba(15, 17, 177, 0.15);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-.tour-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px rgba(15, 17, 177, 0.15);
-}
-.tour-btn:active {
-  transform: translateY(0);
-}
-/* =======================================
-   QUEST LIST TAB STYLES
-   ======================================= */
-
-/* Filter controls */
-.questlist-filters {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding: 15px;
-  background: rgba(0, 30, 180, 0.15);
-  border-radius: 8px;
-  border: 2px solid rgba(100, 150, 255, 0.3);
+    // Regular hotspots
+    else {
+      hotspot.addEventListener("click", () => {
+        if (MAPS[cityId]) {
+          switchMap(cityId);
+        } else {
+          openQuest(cityId);
+        }
+      });
+    }
+  });
 }
 
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+// ==========================
+// UPDATE HOTSPOT VISIBILITY
+// ==========================
+function updateHotspotVisibility() {
+  updateHotspotPositions(); // Use the new positioning function
 }
 
-.questlist-filters label {
-  color: #fff;
-  font-weight: bold;
-  font-size: 14px;
+// ==========================
+// SWITCH MAP
+// ==========================
+function switchMap(mapId) {
+  if (!MAPS[mapId]) return;
+
+ currentMap = mapId;
+  const mapImage = document.getElementById("map-image");
+  mapImage.src = MAPS[mapId].image;
+  
+  // Wait for new map to load before updating hotspots
+  mapImage.onload = () => {
+    updateHotspotPositions();
+      if (!keepQuestOpen) {
+      closeQuest();
+    }
+  };
+  
+  const mapSelector = document.getElementById("map-selector");
+  if (mapSelector) mapSelector.value = mapId;
 }
 
-#questlist-filter {
-  background: rgba(0, 30, 180, 0.3);
-  color: white;
-  border: 2px solid rgba(100, 150, 255, 0.7);
-  padding: 8px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  min-width: 200px;
-  font-size: 14px;
+// ==========================
+// OPEN QUEST
+// ==========================
+function openQuest(cityId) {
+
+  if (cityId === "gallery") {
+    openGallery();
+    return;
+  }
+  const mapId = getMapForQuest(cityId);
+  if (mapId && mapId !== currentMap) {
+    switchMap(mapId, true);
+  }
+
+  const quest = quests[cityId];
+  if (!quest) return;
+
+  currentQuestId = cityId;
+  const questBox = document.getElementById("quest-box");
+  questBox.className = "";
+  if (quest.style) questBox.classList.add(quest.style);
+  if (completedQuests[cityId]) questBox.classList.add("completed");
+
+  document.getElementById("quest-title").innerText = quest.title || "";
+
+  document.getElementById("quest-rationale").innerHTML =
+    `<a href="#" onclick="openRationalePopup('${cityId}')">Rationale</a>`;
+
+  document.getElementById("quest-text").innerText = quest.description || "";
+  document.getElementById("quest-character").src = quest.character || "";
+
+  document.getElementById("quest-rubric").innerHTML =
+    `<a href="#" onclick="openRubricPopup('${cityId}')">Rubric</a>`;
+//==========================reward================================================
+ const rewardCoins = calculateQuestRewardCoins(cityId);
+  questRewards[cityId] = rewardCoins; // Store calculated reward
+  document.getElementById("quest-reward").innerHTML =
+    rewardCoins ? `<strong>${rewardCoins} 💰</strong>` : "—";
+
+  updateProfileRewards();
+  //=================================================================================
+  const pathContainer = document.getElementById("quest-paths");
+  if (pathContainer) {
+    pathContainer.innerHTML = Array.isArray(quest.path) && quest.path.length ? quest.path.join(", ") : "No path assigned";
+  }
+
+  const prereqContainer = document.getElementById("quest-prereq-leads-prereq");
+  if (prereqContainer) {
+    prereqContainer.innerHTML = quest.prerequisites && quest.prerequisites.length
+      ? quest.prerequisites.map(id => {
+          const completed = completedQuests[id] ? '<span class="prereq-check"> ✔</span>' : '';
+          return `<li><a href="#" onclick="openQuest('${id}')">${quests[id].title}</a>${completed}</li>`;
+        }).join('')
+      : "<li>None</li>";
+  }
+
+  // Setup timer controls
+  setupTimerControls(cityId);
+
+  // Setup completion checkbox
+  let questCheck = document.getElementById("quest-check");
+  if (questCheck) {
+    questCheck.checked = !!completedQuests[cityId];
+
+    const freshCheck = questCheck.cloneNode(true);
+    questCheck.parentNode.replaceChild(freshCheck, questCheck);
+    questCheck = freshCheck;
+
+    questCheck.addEventListener("change", () => {
+      handleQuestCheckChange(cityId, questCheck, questBox);
+    });
+  }
+
+  const reqBox = document.getElementById("quest-requirements");
+  if (reqBox) {
+    reqBox.innerHTML = "";
+    if (Array.isArray(quest.requirements)) {
+      const ul = document.createElement("ul");
+      quest.requirements.forEach(r => { const li = document.createElement("li"); li.textContent = r; ul.appendChild(li); });
+      reqBox.appendChild(ul);
+    }
+  }
+
+  const linksEl = document.getElementById("quest-links");
+  if (linksEl) {
+    linksEl.innerHTML = Array.isArray(quest.links)
+      ? quest.links.map((l,i) => `<li><a href="${l.url || '#'}" target="_blank">${l.type || 'Sample'} ${i+1}</a></li>`).join("")
+      : "";
+  }
+
+  const starsContainer = document.querySelector("#quest-box .difficulty .stars");
+  if (starsContainer) {
+    starsContainer.innerHTML = "";
+    const difficulty = quest.difficulty || 0;
+    for (let i = 1; i <= 3; i++) {
+      const star = document.createElement("span");
+      star.className = i <= difficulty ? "star solid" : "star outline";
+      star.innerText = "★";
+      starsContainer.appendChild(star);
+    }
+  }
+
+  const leadsContainer = document.getElementById("quest-prereq-leads-to");
+  if (leadsContainer) {
+    const leads = Object.entries(quests)
+      .filter(([id, q]) => q.prerequisites && q.prerequisites.includes(cityId));
+
+    if (leads.length > 0) {
+      leadsContainer.innerHTML = leads.map(([id, quest]) => {
+        const completed = completedQuests[id] ? '<span class="prereq-check"> ✔</span>' : '';
+        return `<li><a href="#" onclick="openQuest('${id}')">${quest.title}</a>${completed}</li>`;
+      }).join('');
+    } else {
+      leadsContainer.innerHTML = "<li>None</li>";
+    }
+  }
+
+  document.getElementById("quest-overlay").style.display = "block";
 }
 
-#questlist-filter:focus {
-  outline: none;
-  border-color: rgba(150, 200, 255, 1);
-  box-shadow: 0 0 10px rgba(150, 200, 255, 0.5);
-}
+function handleQuestCheckChange(cityId, questCheck, questBox) {
+  if (!questCheck.checked) {
+    completedQuests[currentQuestId] = false;
+    questBox.classList.remove("completed");
 
-#questlist-filter option {
-  background: rgba(0, 30, 180, 0.9);
-  color: white;
-}
-
-.filter-stats {
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 14px;
-  font-style: italic;
-}
-
-/* Quest list container */
-.questlist-container {
-  max-height: 60vh;
-  overflow-y: auto;
-  padding-right: 5px;
-}
-
-.questlist-container::-webkit-scrollbar {
-  width: 8px;
-}
-
-.questlist-container::-webkit-scrollbar-thumb {
-  background: rgba(100, 150, 255, 0.5);
-  border-radius: 4px;
-}
-
-.questlist-container::-webkit-scrollbar-track {
-  background: rgba(0, 30, 180, 0.1);
-}
-
-/* Individual quest item */
-.questlist-item {
-  background: rgba(0, 30, 180, 0.15);
-  border: 2px solid rgba(100, 150, 255, 0.3);
-  border-radius: 8px;
-  padding: 15px;
-  margin-bottom: 10px;
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-.questlist-item:hover {
-  background: rgba(0, 30, 180, 0.25);
-  border-color: rgba(150, 200, 255, 1);
-  box-shadow: 0 0 15px rgba(150, 200, 255, 0.4);
-  transform: translateY(-2px);
-}
-
-.questlist-item.active {
-  border-color: rgba(255, 100, 100, 0.8);
-  background: rgba(255, 0, 0, 0.1);
-  animation: pulseActive 2s infinite;
-}
-
-@keyframes pulseActive {
-  0% { box-shadow: 0 0 0 0 rgba(255, 100, 100, 0.4); }
-  70% { box-shadow: 0 0 0 10px rgba(255, 100, 100, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(255, 100, 100, 0); }
-}
-
-.questlist-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.questlist-title {
-  font-size: 16px;
-  font-weight: bold;
-  color: white;
-  margin: 0;
-}
-
-.questlist-id {
-  font-size: 12px;
-  color: rgba(200, 220, 255, 0.7);
-  background: rgba(0, 30, 180, 0.3);
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
-.questlist-details {
-  display: flex;
-  justify-content: space-between;
-  font-size: 13px;
-  color: rgba(200, 220, 255, 0.8);
-}
-
-.questlist-path {
-  display: inline-block;
-  background: rgba(100, 150, 255, 0.2);
-  padding: 2px 8px;
-  border-radius: 4px;
-  margin-right: 8px;
-}
-
-.questlist-timer {
-  color: #ffcc00;
-  font-weight: bold;
-}
-
-.questlist-timer.active {
-  color: #ff4444;
-  animation: blink 1s infinite;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.questlist-completed {
-  color: #00ff88;
-  font-weight: bold;
-}
-
-/* Empty state */
-.questlist-empty {
-  text-align: center;
-  padding: 40px;
-  color: rgba(255, 255, 255, 0.5);
-  font-style: italic;
-}
-
-/* Responsive styles */
-@media (max-width: 768px) {
-  .questlist-filters {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 15px;
-  }
-  
-  .filter-group {
-    width: 100%;
-  }
-  
-  #questlist-filter {
-    width: 100%;
-    min-width: unset;
-  }
-  
-  .filter-stats {
-    align-self: flex-end;
-  }
-  
-  .questlist-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 5px;
-  }
-  
-  .questlist-details {
-    flex-direction: column;
-    gap: 5px;
-  }
-}
-
-@media (max-width: 480px) {
-  .questlist-item {
-    padding: 12px;
-  }
-  
-  .questlist-title {
-    font-size: 14px;
-  }
-  
-  .questlist-details {
-    font-size: 12px;
-  }
-}
-
-/* =======================================
-   RESPONSIVE BASE STYLES
-   ======================================= */
-
-/* Base responsive adjustments */
-@media (max-width: 1200px) {
-  /* Adjust for tablets and smaller laptops */
-  #quest-box {
-    max-width: 95%;
-    grid-template-columns: repeat(8, 1fr) !important;
-    padding: 10px;
-  }
-  
-  .welcome-scroll,
-  .rationale-scroll,
-  .popup {
-    width: 90%;
-    padding: 40px 30px;
-  }
-}
-
-@media (max-width: 992px) {
-  /* Tablet landscape adjustments */
-  #dropdown-container {
-    top: 10px;
-    left: 10px;
-    padding: 8px;
-    font-size: 14px;
-  }
-  
-  .profile-btn {
-    top: 15px;
-    right: 15px;
-    width: 60px !important;
-    height: 60px !important;
-  }
-  
-  .profile-btn img {
-    width: 60px;
-    height: 60px;
-  }
-  
-  .achievements-btn {
-    bottom: 15px;
-    right: 15px;
-    padding: 10px 14px;
-    font-size: 14px;
-  }
-  
-  /* Quest box grid adjustment */
-  #quest-box {
-    grid-template-columns: repeat(6, 1fr) !important;
-  }
-  
-  .image-cell {
-    grid-column: 1 / 4 !important;
-  }
-  
-  .description-cell {
-    grid-column: 4 / 9 !important;
-  }
-  
-  .requirements-cell {
-    grid-column: 1 / 9 !important;
-    margin-top: 10px;
-  }
-  
-  /* Profile grid adjustment */
-  .profile-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-  }
-}
-
-@media (max-width: 768px) {
-  /* Tablet portrait and large phones */
-  html, body {
-    overflow-y: auto;
-    touch-action: manipulation;
-  }
-  
-  /* Increase touch target sizes */
-  .hotspot {
-    width: 6% !important;
-    height: 1.5% !important;
-    min-width: 24px;
-    min-height: 24px;
-  }
-  
-  /* Adjust dropdown container for mobile */
-  #dropdown-container {
-    position: fixed;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 90%;
-    max-width: 400px;
-    text-align: center;
-    z-index: 3000;
-  }
-  
-  #map-switcher {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  
-  #quest-search-container {
-    width: 100%;
-    margin-right: 0;
-  }
-  
-  /* Quest overlay adjustments */
-  #quest-overlay {
-    padding: 10px;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  
-  #quest-box {
-    grid-template-columns: repeat(4, 1fr) !important;
-    gap: 8px;
-    padding: 8px;
-    margin: 0 auto;
-    width: 100%;
-  }
-  
-  /* Reorganize quest rows for mobile */
-  .quest-row {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 8px;
-  }
-  
-  .quest-cell {
-    grid-column: 1 / -1 !important;
-    width: 100%;
-    margin-bottom: 5px;
-  }
-  
-  /* Header rows - stack vertically */
-  #quest-box > .quest-row:nth-of-type(1),
-  #quest-box > .quest-row:nth-of-type(2) {
-    grid-template-columns: 1fr !important;
-    display: flex !important;
-    flex-direction: column;
-  }
-  
-  .timer-cell,
-  .rationale-cell {
-    justify-content: center !important;
-    text-align: center;
-  }
-  
-  /* Image, description, requirements stack vertically */
-  #quest-box > .quest-row:nth-of-type(3) {
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .image-cell {
-    width: 100%;
-    text-align: center;
-  }
-  
-  #quest-character {
-    max-width: 200px;
-    margin: 0 auto;
-  }
-  
-  /* Prereq/leads tabs */
-  .tabs {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-  }
-  
-  .tab-button {
-    padding: 12px;
-    font-size: 14px;
-    min-height: 44px; /* Minimum touch target */
-  }
-  
-  /* Profile popup adjustments */
-  .profile-grid {
-    grid-template-columns: 1fr;
-    gap: 15px;
-  }
-  
-  #radar-chart-container {
-    order: 2;
-  }
-  
-  .profile-right {
-    order: 3;
-  }
-  
-  .profile-left {
-    order: 1;
-  }
-  
-  /* Welcome tour adjustments */
-  #welcome-tour-talk-bubble {
-    max-width: 90%;
-    padding: 15px;
-    border-radius: 15px;
-  }
-  
-  #welcome-tour-controls button {
-    min-height: 44px;
-    min-width: 44px;
-    padding: 12px;
-    font-size: 14px;
-  }
-  
-  /* Achievements grid adjustment */
-  #achievements-overlay .completed-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  /* Quest list adjustments */
-  .questlist-filters {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-  }
-  
-  .filter-group {
-    width: 100%;
-  }
-  
-  #questlist-filter {
-    width: 100%;
-  }
-  
-  .questlist-item {
-    padding: 12px;
-  }
-  
-  .questlist-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 5px;
-  }
-  
-  .questlist-title {
-    font-size: 15px;
-  }
-  
-  .questlist-details {
-    flex-direction: column;
-    gap: 5px;
-  }
-}
-
-@media (max-width: 576px) {
-  /* Mobile phones */
-  #dropdown-container {
-    font-size: 12px;
-  }
-  
-  select {
-    padding: 8px 10px;
-    font-size: 14px;
-  }
-  
-  #quest-search {
-    padding: 8px 10px;
-    font-size: 14px;
-  }
-  
-  /* Quest box further simplification */
-  #quest-box {
-    grid-template-columns: 1fr !important;
-  }
-  
-  .quest-cell {
-    padding: 8px;
-    font-size: 14px;
-  }
-  
-  #quest-title {
-    font-size: 18px;
-  }
-  
-  /* Profile adjustments */
-  .profile-title {
-    font-size: 20px;
-  }
-  
-  .student-avatar {
-    width: 100px;
-    height: 100px;
-  }
-  
-  .student-name {
-    font-size: 18px;
-  }
-  
-  .profile-btn-small {
-    padding: 10px 12px;
-    font-size: 14px;
-    min-height: 44px;
-  }
-  
-  /* Welcome/Setup overlays */
-  .welcome-scroll,
-  .rationale-scroll,
-  .popup {
-    padding: 25px 20px;
-    width: 95%;
-  }
-  
-  .scroll-body {
-    padding: 15px;
-  }
-  
-  .welcome-scroll h1,
-  .rationale-scroll h1 {
-    font-size: 22px;
-  }
-  
-  /* Character selection */
-  .character-card img {
-    width: 70px;
-    height: 70px;
-  }
-  
-  /* Rubric table adjustments */
-  .rubric-table {
-    display: block;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  
-  .rubric-table th,
-  .rubric-table td {
-    padding: 6px;
-    font-size: 12px;
-  }
-  
-  /* Standards table adjustments */
-  #standards-table {
-    display: block;
-    overflow-x: auto;
-  }
-  
-  #standards-table th,
-  #standards-table td {
-    padding: 6px 4px;
-    font-size: 12px;
-  }
-  
-  /* Timer button adjustments */
-  .timer-accept-btn {
-    padding: 10px 15px;
-    font-size: 14px;
-    min-height: 44px;
-    min-width: 120px;
-  }
-}
-
-@media (max-width: 400px) {
-  /* Small phones */
-  #dropdown-container {
-    padding: 5px;
-  }
-  
-  .profile-btn {
-    width: 50px !important;
-    height: 50px !important;
-    top: 10px;
-    right: 10px;
-  }
-  
-  .profile-btn img {
-    width: 50px;
-    height: 50px;
-  }
-  
-  .achievements-btn {
-    padding: 8px 12px;
-    font-size: 12px;
-    bottom: 10px;
-    right: 10px;
-  }
-  
-  /* Quest overlay */
-  #close-quest,
-  .close-btn {
-    width: 36px;
-    height: 36px;
-    font-size: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  /* Tour controls */
-  #welcome-tour-controls {
-    flex-direction: column;
-  }
-  
-  #welcome-tour-controls button {
-    width: 100%;
-  }
-}
-/* =======================================
-   TOUCH OPTIMIZATIONS
-   ======================================= */
-
-/* Ensure all interactive elements are touch-friendly */
-button,
-select,
-.tab-button,
-.hotspot,
-.character-card,
-.search-result,
-.questlist-item,
-.achievement-header,
-.profile-btn-small,
-.deduct-btn {
-  min-height: 44px; /* Apple's recommended minimum touch target */
-  min-width: 44px;
-  touch-action: manipulation; /* Prevent double-tap zoom */
-}
-/* EXCLUDE checkboxes from min-height rule */
-input[type="checkbox"] {
-  min-height: 20px !important;
-  min-width: 20px !important;
-  touch-action: manipulation;
-}
-
-/* Prevent text selection on interactive elements */
-button, .hotspot, .tab-button {
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-/* Improve touch feedback */
-button:active,
-.tab-button:active,
-.hotspot:active,
-.profile-btn-small:active {
-  transform: scale(0.98);
-  transition: transform 0.1s;
-}
-
-/* Quest checkbox specific styling */
-#quest-check[type="checkbox"] {
-    transform: scale(1) !important;
-    margin: 0 5px !important;
-    width: 20px !important;
-    height: 20px !important;
-    min-width: 20px !important;
-    min-height: 20px !important;
-}
-
-/* Better spacing for touch on mobile */
-@media (max-width: 768px) {
-  /* Increase spacing between interactive elements */
-  button + button,
-  .tab-button + .tab-button,
-  .profile-btn-small + .profile-btn-small {
-    margin-top: 8px;
-  }
-  
-  /* Larger dropdown touch areas */
-  select {
-    padding: 12px;
-    font-size: 16px; /* Prevents iOS zoom on focus */
-  }
-  
-  /* Prevent hover-only interactions on mobile */
-  @media (hover: none) and (pointer: coarse) {
-    .quest-cell:hover {
-      border-color: inherit !important;
-      box-shadow: none !important;
+    // REMOVE GRADES WHEN UNCHECKED
+    if (questGrades[currentQuestId]) {
+      delete questGrades[currentQuestId];
+      saveQuestGrades();
+    }
+    // REMOVE REWARD WHEN UNCHECKED
+    if (questRewards[currentQuestId]) {
+      delete questRewards[currentQuestId];
+      saveQuestRewards();
+    }
+        // UPDATE REWARD DISPLAY IMMEDIATELY
+    const rewardEl = document.getElementById("quest-reward");
+    if (rewardEl) {
+      rewardEl.innerHTML = "—";
     }
     
-    .search-result:hover {
-      background: inherit !important;
+    // UPDATE PROFILE TOTAL
+    updateProfileRewards();
+
+    saveQuestData();
+    return;
+  }
+
+  const password = prompt("Enter teacher password:");
+
+  if (password !== MVP_PASSWORD) {
+    alert("Incorrect password.");
+    questCheck.checked = false;
+    completedQuests[currentQuestId] = false;
+    saveQuestData();
+    return;
+  }
+
+  // ✅ teacher can grade
+  teacherMode = true;
+
+  // Unlock rubric so teacher can edit
+  rubricLocked[currentQuestId] = false;
+  saveRubricLocks();
+
+  // Mark quest completed
+  completedQuests[currentQuestId] = true;
+  gradingEnabled = true;
+  questBox.classList.add("completed");
+
+ // Force remove timer styling when teacher completes it
+  questBox.classList.remove("times-up", "warning");
+  
+  // Also update timer display if it exists
+  const timerDisplay = document.getElementById("timer-display");
+  if (timerDisplay) {
+    timerDisplay.textContent = "Completed";
+  }
+  
+  saveQuestData();
+
+  saveQuestData();
+
+  // Stop timer if quest was accepted
+  if (questAccepted[cityId]) {
+    stopQuestTimer(cityId);
+    questAccepted[cityId] = false;
+    saveQuestAccepted();
+  }
+
+  // OPEN GRADING POPUP AFTER COMPLETION
+  openRubricPopup(currentQuestId);
+}
+
+function saveRubricLocks() {
+  localStorage.setItem("rubricLocked", JSON.stringify(rubricLocked));
+}
+
+function loadRubricLocks() {
+  const data = localStorage.getItem("rubricLocked");
+  return data ? JSON.parse(data) : {};
+}
+
+// ==========================
+// SAVE / LOAD QUEST DATA
+// ==========================
+function saveQuestData() { localStorage.setItem("completedQuests", JSON.stringify(completedQuests)); }
+function loadQuestData() { const saved = localStorage.getItem("completedQuests"); return saved ? JSON.parse(saved) : {}; }
+
+// ==========================
+// CLOSE QUEST
+// ==========================
+function closeQuest() {
+  // Stop any active timer for the current quest
+  if (currentQuestId && questTimers[currentQuestId]) {
+    stopQuestTimer(currentQuestId);
+  }
+  
+  document.getElementById("quest-overlay").style.display = "none";
+  const pathSel = document.getElementById("path-selector");
+  const mvpSel = document.getElementById("mvp-quests");
+  if (pathSel) pathSel.value = "";
+  if (mvpSel) {
+    mvpSel.style.display = "none";
+    mvpSel.innerHTML = '<option value="">Select MVP Quest</option>';
+  }
+}
+
+// ==========================
+// STUDENT SETUP LOGIC
+// ==========================
+let characters = [];
+
+function initializeStudentSetup() {
+  const profile = loadStudentProfile();
+
+  // If profile exists, skip setup and welcome
+  if (profile && profile.name) {
+    updateProfileUI();
+    return;
+  }
+
+  // show welcome overlay first
+  showWelcomeOverlay();
+}
+
+function showWelcomeOverlay() {
+  const welcomeOverlay = document.getElementById("welcome-overlay");
+  if (welcomeOverlay) {
+    welcomeOverlay.style.display = "flex";
+    
+    // Add event listener for the Enter button
+    const welcomeCloseBtn = document.getElementById("welcome-close");
+    if (welcomeCloseBtn) {
+      welcomeCloseBtn.addEventListener("click", () => {
+        welcomeOverlay.style.display = "none";
+        showCharacterSetup(); // This exists and handles the setup
+      });
     }
   }
 }
 
-/* =======================================
-   ORIENTATION SPECIFIC ADJUSTMENTS
-   ======================================= */
+function showStudentSetupOverlay() {
+  const overlay = document.getElementById("student-setup-overlay");
+  const submitBtn = document.getElementById("student-name-submit");
+  const nameInput = document.getElementById("student-name-input");
+  const characterDiv = document.getElementById("character-selection");
+  const charactersList = document.getElementById("characters-list");
 
-@media (max-height: 600px) and (orientation: landscape) {
-  /* Landscape mode on mobile */
-  #dropdown-container {
-    top: 5px;
-    left: 5px;
-    max-width: 250px;
-  }
-  
-  .profile-btn {
-    top: 5px;
-    right: 5px;
-  }
-  
-  .achievements-btn {
-    bottom: 5px;
-    right: 5px;
-  }
-  
-  /* Reduce vertical space in quest overlay */
-  #quest-overlay {
-    padding: 5px;
-  }
-  
-  #quest-box {
-    max-height: 90vh;
-    overflow-y: auto;
-  }
-  
-  .quest-cell {
-    padding: 6px;
-  }
-  
-  /* Profile in landscape */
-  .profile-grid {
-    grid-template-columns: 1fr 1fr;
-    max-height: 80vh;
-    overflow-y: auto;
-  }
-  
-  .profile-left {
-    grid-column: 1;
-  }
-  
-  #radar-chart-container {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  
-  .profile-right {
-    grid-column: 1 / span 2;
-    grid-row: 2;
+  if (!overlay || !submitBtn || !nameInput || !characterDiv || !charactersList) return;
+
+  overlay.style.display = "flex";
+
+  submitBtn.addEventListener("click", () => {
+    const name = nameInput.value.trim();
+    if (!name) return alert("Please enter your name.");
+
+    const profile = {
+      name,
+      character: "profile.png"
+    };
+
+    saveStudentProfile(profile);
+    updateProfileUI();
+
+    nameInput.disabled = true;
+    submitBtn.style.display = "none";
+
+    characterDiv.style.display = "block";
+    loadCharacterSelectionForProfile(charactersList);
+  });
+
+  // load characters
+  fetch("characters/characters.json")
+    .then(res => res.json())
+    .then(data => {
+      characters = data.characters || [];
+
+      charactersList.innerHTML = "";
+      characters.forEach(char => {
+        const card = document.createElement("div");
+        card.className = "character-card";
+        card.innerHTML = `
+          <img src="${char.image}" alt="${char.name}" />
+          <div class="character-name">${char.name}</div>
+        `;
+        card.addEventListener("click", () => {
+          selectCharacter(char);
+        });
+        charactersList.appendChild(card);
+      });
+    });
+
+  submitBtn.addEventListener("click", () => {
+    const name = nameInput.value.trim();
+    if (!name) {
+      alert("Please enter your name.");
+      return;
+    }
+
+    // lock name
+    nameInput.disabled = true;
+    submitBtn.disabled = true;
+
+    characterDiv.style.display = "block";
+  });
+}
+
+function selectCharacter(character) {
+  const profile = {
+    name: document.getElementById("student-name-input").value.trim(),
+    character: character.image
+  };
+
+  saveStudentProfile(profile);
+  updateProfileUI();
+
+  document.getElementById("student-setup-overlay").style.display = "none";
+}
+
+// ==========================
+// PATH DROPDOWN HANDLER
+// ==========================
+function handlePathChange() {
+  const path = this.value;
+  const mvpSelector = document.getElementById("mvp-quests");
+  if (!mvpSelector) return;
+
+  if (path && pathQuests[path]) {
+    mvpSelector.style.display = "inline";
+    mvpSelector.innerHTML = '<option value="">Select MVP Quest</option>';
+
+    const mvpQuests = pathQuests[path].filter(q => q.style === "mvp");
+    if (mvpQuests.length) {
+      mvpQuests.forEach(q => {
+        const opt = document.createElement("option");
+        opt.value = q.id;
+        opt.textContent = q.title;
+        mvpSelector.appendChild(opt);
+      });
+    } else {
+      mvpSelector.innerHTML += '<option value="">No MVP quests available</option>';
+    }
+  } else {
+    mvpSelector.style.display = "none";
   }
 }
 
-/* =======================================
-   HIGH DPI SCREENS
-   ======================================= */
+// ==========================
+// Search engine - fuzzy
+// ==========================
+const searchInput = document.getElementById("quest-search");
+const searchResults = document.getElementById("quest-search-results");
 
-@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-  /* Crisper borders and shadows */
-  .quest-cell,
-  .tab-button,
-  .profile-btn-small {
-    border-width: 1.5px;
+searchInput.addEventListener("input", () => {
+  const term = searchInput.value.trim().toLowerCase();
+  searchResults.innerHTML = "";
+
+  if (term.length < 2) return;
+
+  const matches = fuzzySearchQuests(term);
+
+  if (!matches.length) {
+    searchResults.innerHTML = `<div class="search-result">No results</div>`;
+    return;
+  }
+
+  matches.forEach(({ id, quest }) => {
+    const div = document.createElement("div");
+    div.className = "search-result";
+
+    const paths = Array.isArray(quest.path)
+      ? quest.path.join(", ")
+      : quest.path || "No path";
+
+    div.innerHTML = `
+      <strong>${paths}</strong><br>
+      <span>${quest.title}</span>
+    `;
+
+    div.onclick = () => {
+      const mapId = getMapForQuest(id);
+
+      if (mapId && mapId !== currentMap) {
+        switchMap(mapId);
+      }
+
+      scale = 1;
+      document.getElementById("map-viewport")?.style && (document.getElementById("map-viewport").style.transform = "scale(1)");
+
+      openQuest(id);
+
+      searchResults.innerHTML = "";
+      searchInput.value = "";
+    };
+
+    searchResults.appendChild(div);
+  });
+});
+
+function fuzzySearchQuests(term) {
+  const words = term.split(/\s+/);
+
+  return Object.entries(quests)
+    .map(([id, quest]) => {
+      const haystack = [
+        quest.title,
+        quest.description,
+        ...(quest.requirements || []),
+        ...(quest.path || [])
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      let score = 0;
+
+      words.forEach(word => {
+        if (haystack.includes(word)) score++;
+      });
+
+      return score > 0 ? { id, quest, score } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score);
+}
+
+// ==========================
+// RATIONALE POPUP LOGIC
+// ==========================
+function openRationalePopup(questId) {
+  const quest = quests[questId];
+  if (!quest || !quest.rationale) return;
+
+  document.getElementById("rationale-content").innerHTML =
+    quest.rationale;
+
+  playUnrollSound();
+  document.getElementById("rationale-overlay").style.display = "flex";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const overlay = document.getElementById("rationale-overlay");
+  const closeBtn = document.getElementById("rationale-close");
+
+  if (!overlay || !closeBtn) return;
+
+  closeBtn.addEventListener("click", () => {
+    overlay.style.display = "none";
+  });
+
+  overlay.addEventListener("click", e => {
+    if (e.target === overlay) {
+      overlay.style.display = "none";
+    }
+  });
+
+  window.addEventListener("keydown", e => {
+    if (e.key === "Escape") {
+      overlay.style.display = "none";
+    }
+  });
+});
+
+function playUnrollSound() {
+  const audio = document.getElementById("unroll-sound");
+  if (!audio) return;
+
+  audio.currentTime = 0;
+  audio.volume = 0.25;
+  audio.play();
+}
+
+// =========================
+// ACHIEVEMENTS LIST
+// =========================
+const achievementsData = [
+  {
+    title: "The Master of Perspective",
+    note: "Complete all perspective quests",
+    questsNeeded: ["quest42","quest43","quest44","quest45","quest46", "quest47"]
+  },
+  {
+    title: "The Master of touch",
+    note: "Complete quests that teach how to create different textures",
+    questsNeeded: ["quest7","quest8","quest9","quest10","quest19","quest34","quest35", "quest64", "quest55"]
+  },
+  {
+    title: "The master of the East",
+    note: "Complete all quests related to China\nPS: For 'The Story Tile of the Heart` use a chinese theme for the tile.",
+    questsNeeded: ["quest56","quest49","quest50"]
+  },
+  {
+    title: "The Facemaster",
+    note:"Complete all quests related to portrature (non mvp)",
+    questsNeeded: ["quest18","quest20", "quest21","quest29","quest26","quest27","quest53"], 
+  },
+  {
+    title: "That who understand the principles",
+    note: "Complete all quest related to the Principles of Design",
+    questsNeeded: ["quest59","quest60","quest61","quest62","quest63"]
+  },
+    {
+    title: "The Nature Chronicler",
+    note: "Complete all landscape and natural subject quests.",
+    questsNeeded: ["quest10","quest17","quest24","quest23","quest65"]
+  },
+    {
+    title: "The Abstract Visionary",
+    note: "Explore non-representational and pattern-based art across paths.",
+    questsNeeded: ["quest12","quest13","quest14","quest15","quest36"]
+  },
+    {
+    title: "The Traditionalist",
+    note: "Complete all quests rooted in classical or cultural art traditions.",
+    questsNeeded: ["quest49","quest50","quest54","quest67",]
+  },
+    {
+    title: "The Archtectural Scholar",
+    note: "Excel in architectural drawing, perspective, and structure.",
+    questsNeeded: ["quest42", "quest43", "quest44", "quest25", "quest58", "quest66"]
+  },
+    {
+    title: "The Seasonal Storyteller",
+    note: "Create art inspired by holidays and seasonal themes.",
+    questsNeeded: ["quest51", "quest52"]
+  },
+    {
+    title: "The Still Life Connoisseur",
+    note: "Excel at observing and rendering still life across mediums.",
+    questsNeeded: ["quest5", "quest16", "quest22", "quest41"]
+  },
+    {
+    title: "The Light & Shadow Adept",
+    note: "Master the use of value, light, and shadow across media.",
+    questsNeeded: ["quest5", "quest8", "quest9", "quest33", "quest64"]
+  },
+    {
+    title: "The Acrylic Master",
+    note: "Complete all quests that specifically cite 'acrylic painting'",
+    questsNeeded: ["quest1", "quest4", "quest5", "quest6", "quest10", "quest11", "quest19", "quest33", "quest34", "quest35", "quest36", "quest37", "quest66"]
+  },
+    {
+    title: "The Water Sage",
+    note: "Complete all watercolor-specific quests.",
+    questsNeeded: ["quest32", "quest22", "quest23", "quest24", "quest25", "quest26", "quest27", "quest49", "quest50", "quest65"]
+  },
+    {
+    title: "The 3D Master",
+    note: "Complete all 3D quests",
+    questsNeeded: ["quest53", "quest54", "quest56", "quest57", "quest58", "quest59", "quest60", "quest61", "quest62", "quest63", "quest68"]
+    },  
+    {
+    title: "The Sketch Master",
+    note: "Complete all quests that specifically require pencil, ink or charcoal drawing\nPS:for this achievement, the quest 'Trial of Textured Cubes' need to be done pencil, charcoal or ink",
+    questsNeeded: ["quest53", "quest54", "quest56", "quest57", "quest58", "quest59", "quest60", "quest61", "quest62", "quest63", "quest68"]
+    },
+    {
+    title: "The MVP Conquistador",
+    note: "Complete all high-difficulty summative quests.",
+    questsNeeded: ["quest4","quest11","quest16","quest27", "quest35", "quest36", "quest50", "quest66"]
+  },
+
+
+];
+
+document.addEventListener("DOMContentLoaded", () => {
+
+  document.getElementById("achievements-btn").addEventListener("click", () => {
+
+    const rationaleOverlay = document.getElementById("rationale-overlay");
+    if (rationaleOverlay && rationaleOverlay.style.display === "flex") {
+      rationaleOverlay.style.display = "none";
+    }
+
+    const questOverlay = document.getElementById("quest-overlay");
+    if (questOverlay && questOverlay.style.display === "block") {
+      closeQuest();
+    }
+
+    document.getElementById("achievements-overlay").style.display = "flex";
+    renderCompletedQuests();
+    renderAchievementsList();
+  });
+
+  document.getElementById("close-achievements").addEventListener("click", () => {
+    document.getElementById("achievements-overlay").style.display = "none";
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      const overlay = document.getElementById("achievements-overlay");
+      if (overlay && overlay.style.display === "flex") {
+        overlay.style.display = "none";
+      }
+    }
+  });
+
+  document.querySelectorAll(".achievements-tabs .tab-button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-button").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+
+      document.querySelectorAll(".tab-content").forEach(tab => tab.style.display = "none");
+      document.getElementById("tab-" + btn.dataset.tab).style.display = "block";
+
+      if (btn.dataset.tab === "questlist") {
+      renderQuestList(document.getElementById("questlist-filter").value);
+      }
+    });
+  });
+
+});
+
+function renderCompletedQuests() {
+  const grid = document.getElementById("completed-quests-grid");
+  grid.innerHTML = "";
+
+  const paths = {};
+
+  for (const [id, quest] of Object.entries(quests)) {
+    if (!quest || !completedQuests[id]) continue;
+
+    const questPaths = Array.isArray(quest.path) ? quest.path : [quest.path];
+
+    questPaths.forEach(p => {
+      if (!paths[p]) paths[p] = [];
+      paths[p].push({ id, title: quest.title });
+    });
+  }
+
+  for (const [path, list] of Object.entries(paths)) {
+    if (list.length === 0) continue;
+
+    const col = document.createElement("div");
+    col.innerHTML = `<h3>${path}</h3>`;
+    list.forEach(q => {
+      const link = document.createElement("a");
+      link.href = "#";
+      link.innerText = q.title;
+      link.addEventListener("click", () => {
+        document.getElementById("achievements-overlay").style.display = "none";
+        openQuest(q.id);
+      });
+      col.appendChild(link);
+      col.appendChild(document.createElement("br"));
+    });
+    grid.appendChild(col);
+  }
+}
+
+function renderAchievementsList() {
+  const container = document.getElementById("achievements-list");
+  container.innerHTML = "";
+
+  achievementsData.forEach(item => {
+    const completedCount = item.questsNeeded.filter(qid => completedQuests[qid]).length;
+    const totalCount = item.questsNeeded.length;
+
+    const div = document.createElement("div");
+    div.classList.add("achievement-item");
+
+    const header = document.createElement("div");
+    header.classList.add("achievement-header");
+
+    const expandBtn = document.createElement("button");
+    expandBtn.classList.add("achievement-expand");
+    expandBtn.innerText = "+";
+
+    const title = document.createElement("h3");
+    title.innerHTML = `
+      ${item.title}
+      <span class="achievement-progress">(${completedCount}/${totalCount})</span>
+    `;
+
+    header.appendChild(title);
+    header.appendChild(expandBtn);
+    div.appendChild(header);
+
+    if (item.note) {
+      const note = document.createElement("div");
+      note.classList.add("achievement-note");
+      note.innerText = item.note;
+      div.appendChild(note);
+    }
+
+    const list = document.createElement("ul");
+    list.classList.add("achievement-quests");
+
+    item.questsNeeded.forEach(qid => {
+      const completed = completedQuests[qid];
+
+      const li = document.createElement("li");
+      const link = document.createElement("a");
+      link.href = "#";
+      link.innerText = quests[qid]?.title || qid;
+
+      if (completed) {
+        link.innerHTML += " <span class='ach-check'>✓</span>";
+      }
+
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        document.getElementById("achievements-overlay").style.display = "none";
+        openQuest(qid);
+      });
+
+      li.appendChild(link);
+      list.appendChild(li);
+    });
+
+    div.appendChild(list);
+    container.appendChild(div);
+
+    expandBtn.addEventListener("click", () => {
+      div.classList.toggle("expanded");
+      expandBtn.innerText = div.classList.contains("expanded") ? "−" : "+";
+    });
+  });
+}
+
+// =================================================
+// PATHFINDER QUESTIONNAIRE
+// =================================================
+
+let pathfinderQuestions = null;
+let allMVPQuests = null;
+let currentPathfinderAnswers = {};
+
+// Load pathfinder questions
+async function loadPathfinderQuestions() {
+  try {
+    const response = await fetch('pathfinder-questions.json');
+    pathfinderQuestions = await response.json();
+    console.log('Pathfinder questions loaded:', pathfinderQuestions);
+    return pathfinderQuestions;
+  } catch (error) {
+    console.error('Failed to load pathfinder questions:', error);
+    return null;
+  }
+}
+
+// Load MVP quests from quests.json
+function loadMVPQuests() {
+  if (!quests || Object.keys(quests).length === 0) {
+    console.warn('Quests not loaded yet');
+    return [];
   }
   
-  /* Sharper grid lines */
-  #map-container::after {
-    background-size: 8% 8%;
-  }
+  allMVPQuests = Object.entries(quests)
+    .filter(([id, quest]) => quest.style === 'mvp')
+    .map(([id, quest]) => ({
+      id,
+      title: quest.title,
+      path: Array.isArray(quest.path) ? quest.path[0] : quest.path || 'Unknown Path',
+      description: quest.description || ''
+    }));
+  
+  console.log('MVP Quests loaded:', allMVPQuests);
+  return allMVPQuests;
 }
 
-/* =======================================
-   ACCESSIBILITY IMPROVEMENTS
-   ======================================= */
-
-/* Focus styles for keyboard navigation */
-button:focus,
-select:focus,
-input:focus,
-.tab-button:focus {
-  outline: 3px solid rgba(100, 150, 255, 0.7);
-  outline-offset: 2px;
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  .quest-cell {
-    border: 2px solid white;
+// Render the pathfinder questions
+// Render the pathfinder questions
+function renderPathfinderQuestions() {
+  console.log("Rendering pathfinder questions");
+  const container = document.getElementById('pathfinder-questions-container');
+  const introContainer = document.getElementById('pathfinder-intro');
+  const resultsContainer = document.getElementById('pathfinder-results-container');
+  const submitContainer = document.getElementById('pathfinder-submit-container');
+  
+  if (!container) {
+    console.error("Questions container not found!");
+    return;
   }
   
-  #quest-box.mvp .quest-cell {
-    border: 2px solid yellow;
+  if (!pathfinderQuestions) {
+    console.error("No pathfinder questions loaded!");
+    return;
   }
   
-  .profile-btn-small {
-    border: 2px solid white;
-  }
-}
-
-/* Reduce motion preference */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  // Hide results, show questions
+  resultsContainer.style.display = 'none';
+  submitContainer.style.display = 'block';
+  container.style.display = 'block'; // Make sure container is visible
+  
+  // Show intro
+  if (introContainer) {
+    introContainer.innerHTML = pathfinderQuestions.intro || '';
   }
   
-  .welcome-scroll,
-  .rationale-scroll {
-    animation: none !important;
-  }
+  // Clear container
+  container.innerHTML = '';
   
-  .hotspot.mvp-glow,
-  .mvp-hotspot {
-    animation: none !important;
-  }
+  // Reset answers
+  currentPathfinderAnswers = {};
   
-  #quest-box.warning,
-  #quest-box.mvp.warning {
-    animation: none !important;
-  }
-}
-
-/* =======================================
-   SPECIFIC COMPONENT FIXES
-   ======================================= */
-
-/* Fix for iOS Safari 100vh issue */
-@supports (-webkit-touch-callout: none) {
-  .welcome-overlay,
-  .overlay,
-  #quest-overlay {
-    height: -webkit-fill-available;
-  }
-}
-
-/* Fix for Android Chrome tap highlight */
-* {
-  -webkit-tap-highlight-color: transparent;
-}
-
-/* Fix for Firefox scrollbars */
-.questlist-container {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(100, 150, 255, 0.5) rgba(0, 30, 180, 0.1);
-}
-
-/* Fix for Safari input zoom */
-@media (max-width: 768px) {
-  select,
-  input[type="text"] {
-    font-size: 16px; /* Prevents automatic zoom on iOS */
-  }
-}
-
-
-
-/* ======================Work overlay styles =============================================================== */
-#work-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.817);
-    z-index: 10000;
-    overflow-y: auto;
-    padding: 20px;
-    justify-content: center;
-    align-items: center;
-    min-height: 100%;
-}
-
-/* Work box */
-#work-box {
-    background-color: rgb(36, 180, 0);
-    color: #fff;
-    border-radius: 10px;
-    padding: 25px;
-    max-width: 900px;
-    width: 90%;
-    margin: auto;
-    box-shadow: 0 0 20px rgba(0,0,0,0.5);
-    position: relative;
-}
-
-/* Close button */
-.close-overlay {
-  position: absolute;
-  top: 12px;
-  right: 450px;
-  font-size: 24px;
-  color: white;
-  background: transparent;
-  border: none;
-  cursor: pointer;
+  // Create each question
+  pathfinderQuestions.questions.forEach((question, index) => {
+    const questionDiv = document.createElement('div');
+    questionDiv.className = 'pathfinder-question';
+    questionDiv.dataset.questionId = question.id;
     
-}
-
-/* Work rows */
-.work-row {
-    display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    gap: 10px;
-    margin-bottom: 15px;
-}
-
-/* Work cells - matching quest-cell style */
-.work-cell {
-    background-color: rgba(0,30,180,0.3);
-    border-radius: 8px;
-    padding: 15px;
-    color: #fff;
-    border: 2px solid rgba(100,150,255,0.7);
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.work-cell:hover {
-    background-color: rgba(100,150,255,0.2);
-}
-
-/* Work image section */
-
-.work-image-section label {
-    display: block;
-    font-weight: bold;
-    color: #fff;
-    text-align: center;
-    font-size: 25px;
-}
-#image-preview {
-  display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 4px;
-    max-width: 100%;
-    max-height: 300px;
-    display: none;
-    margin-top: 15px;
-    border: 2px solid rgba(100,150,255,0.7);
-    border-radius: 8px;
-    background-color: rgba(0,30,180,0.2);
-}
-.delete-image-btn {
-    background-color: rgba(220, 53, 69, 0.8);
-    color: white;
-    border: 2px solid rgba(255, 100, 100, 0.7);
-    border-radius: 8px;
-    cursor: pointer;
-    margin-top: 4px;
-    font-size: 12px;
-    padding: 1px 4px; 
-    font-weight: bold;
-}
-.delete-image-btn:hover {
-    background-color: rgba(200, 35, 51, 0.9);
-}
-/* Save work button */
-.save-work {
-    background-color: rgba(40, 167, 69, 0.8);
-    color: white;
-    border: 2px solid rgba(100, 255, 100, 0.7);
-    padding: 2px 4px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: bold;
-    margin-top: 4px;
-    transition: background-color 0.2s;
-    margin-bottom: 5px;
-}
-
-.save-work:hover {
-    background-color: rgba(33, 136, 56, 0.9);
-}
-
-/* Work saved indicator */
-.work-saved-indicator {
-    font-size: 12px;
-    padding: 4px 8px;
-    background-color: rgba(40, 167, 69, 0.8);
-    color: white;
-    border-radius: 12px;
-    display: inline-block;
-    border: 1px solid rgba(100, 255, 100, 0.7);
-    margin-left: 10px;
-  
-}
-/* Work main info grid */
-.work-main-info {
-    grid-column: span 12;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 15px;
-    margin-bottom: 10px;
-}
-/* Field groups */
-.field-group {
-    background-color: rgba(0,30,180,0.3);
-    border-radius: 8px;
-    padding: 15px;
-    border: 2px solid rgba(100,150,255,0.7);
-}
-.field-group label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: bold;
-    color: #fff;
-    text-align: center;
-}
-.field-group input,
-.field-group textarea {
-    width: 90%;
-    padding: 8px 10px;
-    background-color: rgba(255,255,255,0.1);
-    border: 2px solid rgba(100,150,255,0.5);
-    border-radius: 4px;
-    font-size: 14px;
-    color: #fff;
-}
-.field-group input:focus,
-.field-group textarea:focus {
-    outline: none;
-    border-color: rgba(100,150,255,0.9);
-    background-color: rgba(255,255,255,0.15);
-}
-.field-group textarea {
-    resize: vertical;
-    min-height: 40px;
-}
-#work-description{
-  width: 97%;
-}
-/* Description help ============================================= */
-.description-container {
-  position: relative;
-}
-.description-header {
-   display: flex;
-  justify-content: space-between;  /* This pushes items to opposite ends */
-  align-items: center;
-  width: 100%;  /* Take full width of container */
-  margin-bottom: 5px;
-}
-.description-header label {
-  margin-bottom: 0;
-  flex-shrink: 0;
-}
-.help-btn {
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background-color: #007bff34;
-  color: white;
-  border: none;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.2s;
-  flex-shrink: 0;  /* Prevent button from shrinking */
-  margin-left: auto;
-}
-.help-btn:hover {
-  background-color: #0056b3;
-}
-/* Modal styles */
-.modal {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 54%;
-  width: 50%;
-  height: 100%;
-  background-color: rgba(155, 28, 28, 0);
-  z-index: 10000;
-}
-
-.modal-content {
-  position: relative;
-  background-color: white;
-  margin: 5% auto;
-  padding: 20px;
-  width: 80%;
-  max-width: 600px;
-  max-height: 70vh;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  flex-shrink: 0; 
-}
-
-.modal-body {
-  line-height: 1.6;
-  overflow-y: auto;  /* Add vertical scrollbar when needed */
-  padding-right: 10px;  /* Add some padding for the scrollbar */
-}
-
-/* Optional: Style the scrollbar for better appearance */
-.modal-body::-webkit-scrollbar {
-  width: 8px;
-}
-
-.modal-body::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 4px;
-}
-
-.modal-body::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
-}
-
-.modal-body::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
-
-/* Keep your existing styles for the content */
-.modal-body h3 {
-  margin-top: 0;
-  margin-bottom: 10px;
-  font-size: 1.1rem;
-  color: #333;
-}
-
-.modal-body h4 {
-  margin: 10px 0 5px 0;
-  font-size: 1rem;
-  color: #666;
-}
-
-.modal-body ul {
-  margin-bottom: 15px;
-  padding-left: 20px;
-}
-
-.modal-body li {
-  margin-bottom: 5px;
-}
-
-.example {
-  background-color: #f5f5f5;
-  padding: 15px;
-  border-radius: 4px;
-  font-style: italic;
-  margin: 10px 0 20px 0;
-}
-
-/* ==============================Gallery Overlay ===================================*/
-#gallery-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.4);
-  z-index: 2000;
-  overflow-y: auto;
-  padding: 20px;
-}
-
-#gallery-box {
-  background-color: rgba(0,30,180,0.3);
-  color: #fff;
-  border-radius: 10px;
-  padding: 15px;
-  max-width: 900px;
-  width: 90%;
-  margin: auto;
-  box-shadow: 0 0 20px rgba(0,0,0,0.5);
-  position: relative;
-}
-
-.gallery-header {
-  text-align: center;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
-  border-bottom: 2px solid rgba(100,150,255,0.7);
-}
-
-.gallery-header h2 {
-  color: #fff;
-  font-size: 24px;
-  margin: 0;
-}
-
-/* Gallery Grid */
-.gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 15px;
-  padding: 10px;
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
-.gallery-item {
-  background-color: rgba(0,30,180,0.3);
-  border: 2px solid rgba(100,150,255,0.7);
-  border-radius: 8px;
-  padding: 10px;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  display: flex;
-  flex-direction: column;
-}
-
-.gallery-item:hover {
-  transform: scale(1.02);
-  box-shadow: 0 0 15px rgba(100,150,255,0.5);
-}
-
-.gallery-thumbnail {
-  width: 100%;
-  height: 150px;
-  object-fit: cover;
-  border-radius: 4px;
-  margin-bottom: 8px;
-  background-color: rgba(0,0,0,0.2);
-}
-
-.gallery-title {
-  text-align: center;
-  font-size: 14px;
-  color: #fff;
-  margin-top: 5px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.gallery-empty {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 40px;
-  color: rgba(255,255,255,0.6);
-  font-style: italic;
-}
-
-/* Close button for gallery */
-#close-gallery {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  cursor: pointer;
-  font-size: 20px;
-  color: #fff;
-  z-index: 1;
-}
-
-/* Scrollbar styling for gallery grid */
-.gallery-grid::-webkit-scrollbar {
-  width: 8px;
-}
-
-.gallery-grid::-webkit-scrollbar-track {
-  background: rgba(0,30,180,0.2);
-  border-radius: 4px;
-}
-
-.gallery-grid::-webkit-scrollbar-thumb {
-  background: rgba(100,150,255,0.5);
-  border-radius: 4px;
-}
-
-.gallery-grid::-webkit-scrollbar-thumb:hover {
-  background: rgba(100,150,255,0.7);
-}
-
-/* MVP Gallery Items - Gold theme */
-.gallery-item.mvp {
-    background-color: rgba(214, 180, 26, 0.521); /* Gold background */
-    border: 2px solid gold; /* Gold border */
-    box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
-}
-
-.gallery-item.mvp:hover {
-    border-color: rgb(182, 150, 9) !important;
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
-}
-
-.gallery-item.mvp .gallery-title {
-    color: gold;
-    font-weight: bold;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-}
-
-.gallery-item.mvp .gallery-thumbnail {
-    border: 1px solid rgba(255, 215, 0, 0.5);
-}
-
-
-
-/*================================QUESTIONNAIRE STYLING ================================*/
-
-/* Tabs should span full width */
-#achievements-overlay .achievements-tabs {
-    grid-column: 1 / -1;
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-    margin-bottom: 0;
-    flex-wrap: wrap; /* Allow wrapping on small screens */
-}
-
-/* Tab content should span full width and have scroll */
-#achievements-overlay .tab-content {
-    grid-column: 1 / -1;
-    width: 100%;
-    max-height: 50%;
-    padding-right: 5px;
-}
-
-/* Custom scrollbar for tab content */
-#achievements-overlay .tab-content::-webkit-scrollbar {
-    width: 8px;
-}
-
-#achievements-overlay .tab-content::-webkit-scrollbar-thumb {
-    background: rgba(100, 150, 255, 0.5);
-    border-radius: 4px;
-}
-
-#achievements-overlay .tab-content::-webkit-scrollbar-track {
-    background: rgba(0, 30, 180, 0.1);
-}
-
-/* Pathfinder container */
-.pathfinder-container {
-    width: 100%;
-    padding: 5px;
-    box-sizing: border-box;
-}
-
-/* Pathfinder intro - match questlist filter style */
-#pathfinder-intro {
-    background: rgba(0, 30, 180, 0.15);
-    border-radius: 8px;
-    border: 2px solid rgba(100, 150, 255, 0.3);
-    padding: 15px;
-    margin-bottom: 20px;
-    color: white;
-}
-
-#pathfinder-intro h2 {
-    margin-top: 0;
-    color: white;
-    font-size: 1.4em;
-}
-
-/* Questions container with scroll */
-#pathfinder-questions-container {
-    max-height: 45vh;
-    overflow-y: auto;
-    padding-right: 8px;
-    margin-bottom: 15px;
-}
-
-/* Custom scrollbar for questions */
-#pathfinder-questions-container::-webkit-scrollbar {
-    width: 8px;
-}
-
-#pathfinder-questions-container::-webkit-scrollbar-thumb {
-    background: rgba(100, 150, 255, 0.5);
-    border-radius: 4px;
-}
-
-#pathfinder-questions-container::-webkit-scrollbar-track {
-    background: rgba(0, 30, 180, 0.1);
-}
-
-/* Question styling - match quest item style */
-.pathfinder-question {
-    background: rgba(0, 30, 180, 0.15);
-    border: 2px solid rgba(100, 150, 255, 0.3);
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 15px;
-    transition: all 0.3s ease;
-}
-
-.pathfinder-question:hover {
-    background: rgba(0, 30, 180, 0.25);
-    border-color: rgba(150, 200, 255, 1);
-    box-shadow: 0 0 15px rgba(150, 200, 255, 0.4);
-}
-
-.pathfinder-question h4 {
-    margin: 0 0 5px 0;
-    color: white;
-    font-size: 1.1em;
-}
-
-.pathfinder-question-note {
-    color: aqua;
-    font-style: italic;
-    font-size: 0.9em;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px dashed rgba(100, 150, 255, 0.3);
-}
-
-/* Answers container */
-.pathfinder-answers {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-/* Answer option styling */
-.pathfinder-answer {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: 6px;
-    background: rgba(0, 30, 180, 0.2);
-    border: 1px solid rgba(100, 150, 255, 0.2);
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.pathfinder-answer:hover {
-    background: rgba(0, 30, 180, 0.3);
-    border-color: rgba(150, 200, 255, 0.6);
-}
-
-.pathfinder-answer.selected {
-    background: rgba(0, 30, 180, 0.4);
-    border: 2px solid aqua;
-    box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
-}
-
-.pathfinder-answer input[type="radio"] {
-    margin-top: 3px;
-    cursor: pointer;
-    accent-color: aqua; /* Makes radio button match theme */
-}
-
-.pathfinder-answer label {
-    flex: 1;
-    cursor: pointer;
-    color: white;
-    line-height: 1.4;
-}
-
-.pathfinder-answer label strong {
-    color: aqua;
-    margin-right: 5px;
-}
-
-/* Submit button - match tab button style */
-#pathfinder-submit {
-    background: rgba(0, 30, 180, 0.3);
-    border: 2px solid rgba(100, 150, 255, 0.7);
-    color: white;
-    padding: 12px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: bold;
-    transition: all 0.3s;
-    width: 100%;
-    margin-top: 10px;
-}
-
-#pathfinder-submit:hover {
-    background: rgba(0, 30, 180, 0.5);
-    border-color: aqua;
-    box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
-}
-
-/* Results container */
-#pathfinder-results-container {
-    width: 100%;
+    // Question header
+    const header = document.createElement('h4');
+    header.textContent = `${question.id}. ${question.text}`;
+    questionDiv.appendChild(header);
     
-}
-
-#pathfinder-result-message {
-    background: rgba(0, 30, 180, 0.15);
-    border: 2px solid rgba(100, 150, 255, 0.3);
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 20px;
-    border-left: 4px solid aqua;
-    line-height: 1.5;
-    color: white;
-}
-
-#pathfinder-result-message p {
-    margin: 0;
-}
-
-/* Results quest list */
-#pathfinder-quest-list {
-    max-height: 40vh;
-    overflow-y: auto;
-    padding-right: 5px;
-    margin-bottom: 15px;
-}
-
-/* Scrollbar for results list */
-#pathfinder-quest-list::-webkit-scrollbar {
-    width: 8px;
-}
-
-#pathfinder-quest-list::-webkit-scrollbar-thumb {
-    background: rgba(100, 150, 255, 0.5);
-    border-radius: 4px;
-}
-
-#pathfinder-quest-list::-webkit-scrollbar-track {
-    background: rgba(0, 30, 180, 0.1);
-}
-
-/* Force results to be visible when displayed */
-#pathfinder-results-container[style*="display: block"] {
-    display: block !important;
-}
-
-/* Make sure questions are hidden when results show */
-#pathfinder-questions-container[style*="display: none"] {
-    display: none !important;
-}
-
-/* Debug outline to see if container is there but invisible */
-#pathfinder-results-container {
-    min-height: 100px;
-    max-height: 90%;
-    background: rgba(0,0,0,0.2);
-}
-
-/* Retake button */
-#pathfinder-retake {
-    background: rgba(0, 30, 180, 0.2);
-    border: 2px solid rgba(100, 150, 255, 0.5);
-    color: white;
-    padding: 10px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: all 0.3s;
-}
-
-#pathfinder-retake:hover {
-    background: rgba(0, 30, 180, 0.4);
-    border-color: aqua;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    #achievements-overlay .quest-box {
-        max-height: 90vh;
-        padding: 10px;
+    // Question note
+    if (question.note) {
+      const note = document.createElement('div');
+      note.className = 'pathfinder-question-note';
+      note.textContent = question.note;
+      questionDiv.appendChild(note);
     }
     
-    #achievements-overlay .tab-content {
-        max-height: 70vh;
+    // Answers container
+    const answersDiv = document.createElement('div');
+    answersDiv.className = 'pathfinder-answers';
+    
+    // Create each answer
+    question.answers.forEach(answer => {
+      const answerId = `q${question.id}_${answer.letter}`;
+      
+      const answerWrapper = document.createElement('div');
+      answerWrapper.className = 'pathfinder-answer';
+      
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = `question_${question.id}`;
+      radio.value = answer.letter;
+      radio.id = answerId;
+      
+      const label = document.createElement('label');
+      label.htmlFor = answerId;
+      label.innerHTML = `<strong>${answer.letter})</strong> ${answer.text}`;
+      
+      answerWrapper.appendChild(radio);
+      answerWrapper.appendChild(label);
+      
+      // Add click handler to wrapper for better UX
+      answerWrapper.addEventListener('click', (e) => {
+        if (e.target.tagName !== 'INPUT') {
+          radio.checked = true;
+          // Trigger change event
+          const event = new Event('change', { bubbles: true });
+          radio.dispatchEvent(event);
+        }
+      });
+      
+      // Add change handler
+      radio.addEventListener('change', () => {
+        // Remove selected class from all answers in this question
+        document.querySelectorAll(`.pathfinder-question[data-question-id="${question.id}"] .pathfinder-answer`)
+          .forEach(el => el.classList.remove('selected'));
+        
+        // Add selected class to this answer
+        answerWrapper.classList.add('selected');
+        
+        // Store answer
+        currentPathfinderAnswers[question.id] = answer.letter;
+      });
+      
+      answersDiv.appendChild(answerWrapper);
+    });
+    
+    questionDiv.appendChild(answersDiv);
+    container.appendChild(questionDiv);
+  });
+  
+  console.log("Questions rendered, container display:", window.getComputedStyle(container).display);
+}
+// Process answers and find top quests
+function processPathfinderAnswers() {
+  console.log("=== PROCESSING PATHFINDER ANSWERS ===");
+  console.log("Current answers:", currentPathfinderAnswers);
+  // Check if all questions answered
+  const totalQuestions = pathfinderQuestions.questions.length;
+  const answeredCount = Object.keys(currentPathfinderAnswers).length;
+    console.log(`Questions: ${answeredCount}/${totalQuestions} answered`);
+  
+  if (answeredCount < totalQuestions) {
+    alert(`Please answer all ${totalQuestions} questions before finding your path.`);
+    return null;
+  }
+  
+    // Check if MVP quests are loaded
+  console.log("MVP Quests:", allMVPQuests);
+  
+  if (!allMVPQuests || allMVPQuests.length === 0) {
+    console.error("No MVP quests loaded!");
+    allMVPQuests = loadMVPQuests(); // Try loading again
+    console.log("Reloaded MVP Quests:", allMVPQuests);
+  }
+  // Initialize scores for all MVP quests
+  const scores = {};
+  allMVPQuests.forEach(quest => {
+    scores[quest.id] = 0;
+  });
+    console.log("Initialized scores:", scores);
+  // Apply scoring from answers
+  pathfinderQuestions.questions.forEach(question => {
+    const answerLetter = currentPathfinderAnswers[question.id];
+     console.log(`Question ${question.id}: Selected ${answerLetter}`);
+    const answerObj = question.answers.find(a => a.letter === answerLetter);
+      console.log(`Answer object:`, answerObj);
+    if (answerObj && answerObj.score) {
+            console.log(`Score mapping for Q${question.id}:`, answerObj.score);
+      Object.entries(answerObj.score).forEach(([questId, points]) => {
+        if (scores.hasOwnProperty(questId)) {
+          scores[questId] += points;
+            console.log(`  Added ${points} to ${questId} (now ${scores[questId]})`);
+        } else {
+          console.log(`  Quest ${questId} not in MVP list, skipping`);
+        }
+      });
+    }
+  });
+    console.log("Final scores:", scores);
+  // Convert to array and sort
+  const sortedQuests = Object.entries(scores)
+    .filter(([id, score]) => score > 0) // Only quests with points
+    .sort((a, b) => b[1] - a[1]) // Sort by score descending
+    .slice(0, 5) // Top 5
+    .map(([id, score]) => {
+      const quest = allMVPQuests.find(q => q.id === id);
+      return {
+        ...quest,
+        score
+      };
+    });
+  
+  console.log('Top quests:', sortedQuests);
+  return sortedQuests;
+}
+
+// Render results
+function renderPathfinderResults(topQuests) {
+  console.log("=== RENDERING PATHFINDER RESULTS ===");
+  console.log("Top quests to render:", topQuests);
+  
+  const questionsContainer = document.getElementById('pathfinder-questions-container');
+  const resultsContainer = document.getElementById('pathfinder-results-container');
+  const submitContainer = document.getElementById('pathfinder-submit-container');
+  const resultMessageDiv = document.getElementById('pathfinder-result-message');
+  const questListDiv = document.getElementById('pathfinder-quest-list');
+  
+  console.log("Elements found:", {
+    questionsContainer: !!questionsContainer,
+    resultsContainer: !!resultsContainer,
+    submitContainer: !!submitContainer,
+    resultMessageDiv: !!resultMessageDiv,
+    questListDiv: !!questListDiv
+  });
+  
+  if (!resultsContainer || !questListDiv) {
+    console.error("Required result elements not found!");
+    return;
+  }
+  
+  if (!topQuests || topQuests.length === 0) {
+    console.log("No top quests found");
+    if (resultMessageDiv) {
+      resultMessageDiv.innerHTML = '<p>No matching quests found. Try different answers!</p>';
+    }
+  } else {
+    // Find appropriate result message
+    const topQuestIds = topQuests.map(q => q.id);
+    console.log("Top quest IDs:", topQuestIds);
+    
+    let bestMessage = pathfinderQuestions.resultMessages.find(msg => 
+      msg.keywords.some(keyword => topQuestIds.includes(keyword))
+    );
+    
+    if (!bestMessage) {
+      bestMessage = {
+        message: "Your answers reveal a unique artistic path! The quests below match your interests. Choose the one that calls to you most strongly."
+      };
     }
     
-    #pathfinder-questions-container {
-        max-height: 50vh;
+    console.log("Selected message:", bestMessage);
+    
+    if (resultMessageDiv) {
+      resultMessageDiv.innerHTML = `<p>${bestMessage.message}</p>`;
     }
     
-    .pathfinder-question {
-        padding: 12px;
+    // Render quest list
+    questListDiv.innerHTML = '';
+    console.log("Rendering", topQuests.length, "quests");
+    
+    topQuests.forEach((quest, index) => {
+      console.log(`Rendering quest ${index + 1}:`, quest);
+      
+      const questElement = document.createElement('div');
+      questElement.className = 'questlist-item';
+      questElement.dataset.questId = quest.id;
+      
+      const isCompleted = completedQuests[quest.id] || false;
+      const isActive = questAccepted[quest.id] || false;
+      
+      // Get path display
+      let pathDisplay = quest.path || 'Unknown Path';
+      
+      questElement.innerHTML = `
+        <div class="questlist-header">
+          <h3 class="questlist-title">${index + 1}. ${quest.title || 'Untitled'}</h3>
+          <span class="questlist-id">${quest.id}</span>
+        </div>
+        <div class="questlist-details">
+          <div>
+            <span class="questlist-path">${pathDisplay}</span>
+          </div>
+          <div>
+            ${isCompleted ? '<span class="questlist-completed">✓ Completed</span>' : ''}
+            ${isActive ? '<span class="questlist-timer active">🔴 Active</span>' : ''}
+          </div>
+        </div>
+      `;
+      
+      // Add click event
+      questElement.addEventListener('click', () => {
+        console.log("Quest clicked:", quest.id);
+        document.getElementById('achievements-overlay').style.display = 'none';
+        openQuest(quest.id);
+      });
+      
+      questListDiv.appendChild(questElement);
+    });
+  }
+  
+  // Hide questions, show results
+  console.log("Hiding questions, showing results");
+  if (questionsContainer) questionsContainer.style.display = 'none';
+  if (resultsContainer) resultsContainer.style.display = 'block';
+  if (submitContainer) submitContainer.style.display = 'none';
+}
+// Reset pathfinder
+function resetPathfinder() {
+  const questionsContainer = document.getElementById('pathfinder-questions-container');
+  const resultsContainer = document.getElementById('pathfinder-results-container');
+  const submitContainer = document.getElementById('pathfinder-submit-container');
+  
+  questionsContainer.style.display = 'block';
+  resultsContainer.style.display = 'none';
+  submitContainer.style.display = 'block';
+  
+  // Re-render questions to reset selections
+  renderPathfinderQuestions();
+}
+
+// Initialize pathfinder
+// Initialize pathfinder
+async function initializePathfinder() {
+  console.log("Initializing Pathfinder...");
+  
+  // Load questions
+  await loadPathfinderQuestions();
+  console.log("Pathfinder questions loaded in init");
+  
+  // Load MVP quests
+  loadMVPQuests();
+  console.log("MVP Quests loaded in init:", allMVPQuests);
+  
+  // Now render the questions
+  renderPathfinderQuestions();
+  
+  // Get elements and set up event listeners
+  const submitBtn = document.getElementById('pathfinder-submit');
+  const retakeBtn = document.getElementById('pathfinder-retake');
+  
+  console.log("Submit button:", submitBtn);
+  console.log("Retake button:", retakeBtn);
+  
+  // Submit button
+  if (submitBtn) {
+    // Remove any existing listeners
+    const newSubmitBtn = submitBtn.cloneNode(true);
+    submitBtn.parentNode.replaceChild(newSubmitBtn, submitBtn);
+    
+    newSubmitBtn.addEventListener('click', () => {
+      console.log("Submit button clicked");
+      const topQuests = processPathfinderAnswers();
+      if (topQuests) {
+        renderPathfinderResults(topQuests);
+      }
+    });
+  }
+  
+  // Retake button
+  if (retakeBtn) {
+    const newRetakeBtn = retakeBtn.cloneNode(true);
+    retakeBtn.parentNode.replaceChild(newRetakeBtn, retakeBtn);
+    
+    newRetakeBtn.addEventListener('click', () => {
+      console.log("Retake button clicked");
+      resetPathfinder();
+    });
+  }
+}
+
+// Update the tab click handler
+document.querySelectorAll(".achievements-tabs .tab-button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    // Remove active class from all tabs
+    document.querySelectorAll(".tab-button").forEach(b => b.classList.remove("active"));
+    
+    // Add active class to clicked tab
+    btn.classList.add("active");
+
+    // Hide all tab content
+    document.querySelectorAll(".tab-content").forEach(tab => tab.style.display = "none");
+    
+    // Show the selected tab content
+    const tabId = "tab-" + btn.dataset.tab;
+    document.getElementById(tabId).style.display = "block";
+    
+    // Handle specific tab functionality
+    if (btn.dataset.tab === "questlist") {
+      renderQuestList(document.getElementById("questlist-filter").value);
+    } else if (btn.dataset.tab === "pathfinder") {
+      // Initialize pathfinder if needed
+      if (!pathfinderQuestions) {
+        initializePathfinder();
+      } else {
+      }
+    }
+  });
+});
+
+
+// ==========================
+// RUBRIC POPUP + GRADING
+// ==========================
+function openRubricPopup(cityId) {
+  const overlay = document.getElementById("rubric-overlay");
+  const content = document.getElementById("rubric-content");
+  const title = document.getElementById("rubric-title");
+
+  document.getElementById("quest-overlay").style.display = "none";
+
+  const quest = quests[cityId];
+  if (!quest || !quest.rubric) return;
+
+  currentQuestId = cityId;
+
+  // If undefined, treat as locked
+  const isLocked = rubricLocked[cityId] !== false;
+
+  title.textContent = quest.rubric.overall || quest.title;
+
+  const column = quest.style === "mvp" ? "mvpGrade" : "grade";
+
+  let html = `<table class="rubric-table">
+    <thead>
+      <tr>
+        <th>Standard</th>
+        <th>Grade 4</th>
+        <th>Grade 3</th>
+        <th>Grade 2</th>
+        <th>Grade 1</th>
+        <th>Your Grade</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  quest.rubric.standards.forEach(std => {
+    const saved = questGrades[cityId]?.[column]?.[std.code] ?? "";
+
+    const highlightGrade = saved !== "" ? Math.floor(saved) : null;
+
+    html += `<tr>
+      <td>${std.code}</td>
+      <td class="${highlightGrade === 4 ? "highlight" : ""}">${std.levels["4"] || ""}</td>
+      <td class="${highlightGrade === 3 ? "highlight" : ""}">${std.levels["3"] || ""}</td>
+      <td class="${highlightGrade === 2 ? "highlight" : ""}">${std.levels["2"] || ""}</td>
+      <td class="${highlightGrade === 1 ? "highlight" : ""}">${std.levels["1"] || ""}</td>
+      <td>
+        <select class="grade-select" data-standard="${std.code}" ${isLocked ? "disabled" : ""}>
+          <option value="">—</option>
+          <option value="1"${saved === 1 ? " selected" : ""}>1</option>
+          <option value="1.5"${saved === 1.5 ? " selected" : ""}>1.5</option>
+          <option value="2"${saved === 2 ? " selected" : ""}>2</option>
+          <option value="2.5"${saved === 2.5 ? " selected" : ""}>2.5</option>
+          <option value="3"${saved === 3 ? " selected" : ""}>3</option>
+          <option value="3.5"${saved === 3.5 ? " selected" : ""}>3.5</option>
+          <option value="4"${saved === 4 ? " selected" : ""}>4</option>
+        </select>
+      </td>
+    </tr>`;
+  });
+
+  html += `</tbody></table>`;
+
+  html += `
+    <div id="rubric-lock-controls">
+      <button id="unlock-rubric" ${isLocked ? "" : "style='display:none'"}>Unlock for Editing</button>
+      <span id="rubric-lock-status">${isLocked ? "Locked (students can view)" : "Unlocked (editing enabled)"}</span>
+    </div>
+  `;
+
+  content.innerHTML = html;
+  overlay.style.display = "flex";
+
+  const unlockBtn = document.getElementById("unlock-rubric");
+  const closeBtn = document.getElementById("close-rubric");
+
+  unlockBtn.addEventListener("click", () => {
+    const password = prompt("Enter teacher password:");
+
+    if (password === MVP_PASSWORD) {
+      rubricLocked[cityId] = false;
+      saveRubricLocks();
+
+      document.querySelectorAll(".grade-select").forEach(s => s.disabled = false);
+      unlockBtn.style.display = "none";
+      document.getElementById("rubric-lock-status").innerText = "Unlocked (editing enabled)";
+    } else {
+      alert("Incorrect password.");
+    }
+  });
+
+  closeBtn.addEventListener("click", () => {
+    rubricLocked[cityId] = true;
+    saveRubricLocks();
+
+    // Refresh the quest reward before showing quest popup
+    const rewardCoins = calculateQuestRewardCoins(cityId);
+    questRewards[cityId] = rewardCoins;
+    saveQuestRewards();
+    
+    // Update the quest reward display
+    const rewardEl = document.getElementById("quest-reward");
+    if (rewardEl) {
+      rewardEl.innerHTML = rewardCoins ? `<strong>${rewardCoins} 💰</strong>` : "—";
     }
     
-    .pathfinder-answer {
-        padding: 8px 10px;
-    }
+    // Update profile total
+    updateProfileRewards();
+    //===============================================================================
+    overlay.style.display = "none";
+    document.getElementById("quest-overlay").style.display = "flex";
+  });
+
+  document.querySelectorAll(".grade-select").forEach(select => {
+    select.addEventListener("change", () => {
+      const standardCode = select.dataset.standard;
+      const value = parseFloat(select.value);
+
+      if (!questGrades[cityId]) questGrades[cityId] = { grade: {}, mvpGrade: {} };
+
+      if (!questGrades[cityId][column]) {
+        questGrades[cityId][column] = {};
+      }
+
+      if (isNaN(value)) {
+        questGrades[cityId][column][standardCode] = null;
+      } else {
+        questGrades[cityId][column][standardCode] = value;
+      }
+
+      saveQuestGrades();
+      ensureMVPColumnExists();
+      updateProfileStandardsTable();
+      renderRadarChart();
+      updateProfileRewards();
+    });
+
+    //============================== REWARD SYSTEM =========================================
+    // Recalculate quest reward
+const coins = calculateQuestRewardCoins(cityId);
+questRewards[cityId] = coins;
+saveQuestRewards();
+
+// Update quest reward UI if quest is open
+const rewardEl = document.getElementById("quest-reward");
+if (rewardEl) {
+  rewardEl.innerText = coins ? `${coins} 💰` : "";
 }
 
-@media (max-width: 480px) {
-    .pathfinder-question h4 {
-        font-size: 1em;
+updateProfileRewards();
+  });
+}
+
+// ==========================
+// DEDUCT REWARDS SYSTEM
+// ==========================
+
+// Calculate net rewards per standard (total earned minus deductions for that standard)
+function calculateNetRewardsPerStandard() {
+    const { totals } = calculateRewardsPerStandard();
+    const netTotals = {};
+    
+    Object.keys(totals).forEach(standardCode => {
+        const earned = totals[standardCode] || 0;
+        const deducted = standardDeductions[standardCode] || 0;
+        netTotals[standardCode] = Math.max(0, earned - deducted);
+    });
+    
+    return netTotals;
+}
+
+// Calculate total net rewards across all standards
+function calculateTotalNetRewards() {
+    const netTotals = calculateNetRewardsPerStandard();
+    return Object.values(netTotals).reduce((sum, val) => sum + val, 0);
+}
+
+// Calculate net rewards for profile display (for backward compatibility)
+function calculateNetRewards() {
+    return calculateTotalNetRewards();
+}
+
+// Update profile rewards display with net amount
+function updateProfileRewards() {
+    const netRewards = calculateTotalNetRewards();
+    
+    console.log("=== DEBUG: updateProfileRewards() called ===");
+    console.log("Net rewards:", netRewards);
+    
+    // UPDATE THE SPAN ELEMENT
+    const el = document.getElementById("profile-total-coins");
+    if (el) {
+        console.log("Found #profile-total-coins element, updating with net rewards...");
+        el.innerText = `${netRewards} 💰`;
+        console.log("Updated element with:", el.innerText);
+    } else {
+        console.error("ERROR: Could not find #profile-total-coins element!");
     }
     
-    .pathfinder-answer label {
-        font-size: 0.9em;
+    const rewardsOverlay = document.getElementById("rewards-overlay");
+    if (rewardsOverlay && rewardsOverlay.style.display === "flex") {
+        const { totals, sources } = calculateRewardsPerStandard();
+        renderRewardsTable(totals, sources);
+        
+        const totalAll = Object.values(totals).reduce((sum, val) => sum + val, 0);
+        const totalSummary = document.getElementById("rewards-total-summary");
+        if (totalSummary) {
+            totalSummary.innerHTML = `Total Rewards: <strong>${totalAll} 💰</strong>`;
+        }
     }
     
-    #pathfinder-intro h2 {
-        font-size: 1.2em;
+    // Also update quest reward display if quest is open
+    if (currentQuestId && document.getElementById("quest-overlay").style.display === "block") {
+        const questRewardEl = document.getElementById("quest-reward");
+        if (questRewardEl) {
+            // Show individual quest reward (not affected by deductions)
+            const questCoins = questRewards[currentQuestId] || 0;
+            questRewardEl.innerHTML = questCoins ? `<strong>${questCoins} 💰</strong>` : "—";
+        }
     }
 }
 
-/*-------------------------------------- Rewards by Standard Overlay------------------------------------------- */
-#rewards-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.847);
-    z-index: 2100;
-    overflow-y: auto;
-    padding: 20px;
+// Helper function to get total earned (before deductions)
+function getTotalEarnedRewards() {
+    let total = 0;
+    Object.entries(completedQuests).forEach(([qid, isCompleted]) => {
+        if (isCompleted) {
+            const coins = calculateQuestRewardCoins(qid);
+            total += coins;
+        }
+    });
+    return total;
 }
 
-.rewards-overlay {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-#rewards-box {
-    background-color: rgba(0,30,180,0.3);
-    color: #fff;
-    border-radius: 10px;
-    padding: 20px;
-    max-width: 900px;
-    width: 90%;
-    margin: auto;
-    box-shadow: 0 0 20px rgba(0,0,0,0.5);
-    position: relative;
-    border: 2px solid rgba(100,150,255,0.7);
-}
-
-#close-rewards {
-    position: absolute;
-    top: 10px;
-    right: 15px;
-    cursor: pointer;
-    font-size: 24px;
-    color: #fff;
-    z-index: 1;
-}
-
-#close-rewards:hover {
-    color: #0707ef;
-}
-
-#rewards-title {
-    text-align: center;
-    margin-bottom: 20px;
-    font-size: 1.5em;
-    color: #fff;
-    border-bottom: 2px solid rgba(100,150,255,0.5);
-    padding-bottom: 10px;
-}
-
-#rewards-total-summary {
-    text-align: right;
-    margin-bottom: 15px;
-    font-size: 1.2em;
-    color: #ffd700;
-    padding: 5px 10px;
-    background: rgba(0,30,180,0.2);
-    border-radius: 10px;
-}
-
-.rewards-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 10px;
+// Deduct rewards from a specific standard
+function deductFromStandard(standardCode, maxAvailable) {
+    // Ask for teacher password
+    const password = prompt("Enter teacher password to deduct rewards:");
     
+    if (password !== MVP_PASSWORD) {
+        alert("Incorrect password. Only teachers can deduct rewards.");
+        return;
+    }
+    
+    const currentAvailable = maxAvailable - (standardDeductions[standardCode] || 0);
+    
+    if (currentAvailable <= 0) {
+        alert(`No rewards available to deduct for ${STANDARD_SHORT_NAMES[standardCode] || standardCode}`);
+        return;
+    }
+    
+    const deduction = prompt(
+        `${STANDARD_SHORT_NAMES[standardCode] || standardCode}\n` +
+        `Earned: ${maxAvailable} 💰\n` +
+        `Already deducted: ${standardDeductions[standardCode] || 0} 💰\n` +
+        `Currently available: ${currentAvailable} 💰\n\n` +
+        `Enter amount to deduct (max ${currentAvailable}):`
+    );
+    
+    if (!deduction || isNaN(deduction) || deduction.trim() === "") {
+        alert("No deduction amount entered.");
+        return;
+    }
+    
+    const deductionAmount = parseInt(deduction);
+    
+    if (deductionAmount <= 0) {
+        alert("Deduction amount must be positive.");
+        return;
+    }
+    
+    if (deductionAmount > currentAvailable) {
+        alert(`Cannot deduct ${deductionAmount}. Maximum available: ${currentAvailable}`);
+        return;
+    }
+    
+    // Ask for reason
+    const reason = prompt("Optional: Enter reason for deduction:") || "No reason provided";
+    
+    // Confirm deduction
+    if (confirm(`Deduct ${deductionAmount} 💰 from ${STANDARD_SHORT_NAMES[standardCode] || standardCode}?\n\nReason: ${reason}`)) {
+        // Update standard deductions
+        standardDeductions[standardCode] = (standardDeductions[standardCode] || 0) + deductionAmount;
+        saveStandardDeductions();
+        
+        // Log the deduction
+        logStandardDeduction(standardCode, deductionAmount, reason);
+        
+        // Refresh displays
+        refreshAllRewardDisplays();
+        
+        alert(`✅ ${deductionAmount} 💰 deducted from ${STANDARD_SHORT_NAMES[standardCode] || standardCode}!\n` +
+              `New available: ${currentAvailable - deductionAmount} 💰`);
+    }
 }
 
-.rewards-table th,
-.rewards-table td {
-    padding: 5px;
-    text-align: left;
-    border: 1px solid rgba(100,150,255,0.3);
+// Log standard-specific deductions
+function logStandardDeduction(standardCode, amount, reason) {
+    const deductionLog = loadDeductionLog();
+    const logEntry = {
+        date: new Date().toISOString(),
+        standard: standardCode,
+        standardName: STANDARD_NAMES[standardCode] || standardCode,
+        amount: amount,
+        reason: reason,
+        teacher: "Teacher"
+    };
+    
+    deductionLog.push(logEntry);
+    localStorage.setItem("deductionLog", JSON.stringify(deductionLog));
 }
 
-.rewards-table th {
-    background-color: rgba(0,30,180,0.5);
-    font-weight: bold;
-    color: #fff;
+// Update the refresh function
+function refreshAllRewardDisplays() {
+    // Update profile total (using net total)
+    const el = document.getElementById("profile-total-coins");
+    if (el) {
+        el.innerText = `${calculateTotalNetRewards()} 💰`;
+    }
+    
+    // Update rewards overlay if open
+    const rewardsOverlay = document.getElementById("rewards-overlay");
+    if (rewardsOverlay && rewardsOverlay.style.display === "flex") {
+        const { totals, sources } = calculateRewardsPerStandard();
+        renderRewardsTable(totals, sources);
+        
+        const totalSummary = document.getElementById("rewards-total-summary");
+        if (totalSummary) {
+            totalSummary.innerHTML = `Total Net Rewards: <strong>${calculateTotalNetRewards()} 💰</strong>`;
+        }
+    }
+    
+    // Update quest overlay if open
+    if (currentQuestId && document.getElementById("quest-overlay").style.display === "block") {
+        const questRewardEl = document.getElementById("quest-reward");
+        if (questRewardEl) {
+            const questCoins = questRewards[currentQuestId] || 0;
+            questRewardEl.innerHTML = questCoins ? `<strong>${questCoins} 💰</strong>` : "—";
+        }
+    }
+    
+    console.log("All reward displays refreshed. New net balance:", calculateTotalNetRewards());
 }
 
-.rewards-table td {
-    background-color: rgba(0,30,180,0.2);
+// Log deductions for record keeping
+function logDeduction(amount, reason) {
+    const deductionLog = loadDeductionLog();
+    const logEntry = {
+        date: new Date().toISOString(),
+        amount: amount,
+        reason: reason,
+        teacher: "Teacher",
+        balanceBefore: calculateTotalNetRewards() + amount,
+        balanceAfter: calculateTotalNetRewards()
+    };
+    
+    deductionLog.push(logEntry);
+    localStorage.setItem("deductionLog", JSON.stringify(deductionLog));
+    
+    console.log("Deduction logged:", logEntry);
 }
 
-.rewards-table tr:hover td {
-    background-color: rgba(100,150,255,0.2);
+// Load deduction log
+function loadDeductionLog() {
+    const data = localStorage.getItem("deductionLog");
+    return data ? JSON.parse(data) : [];
 }
 
-.reward-amount {
-    font-weight: bold;
-    color: #ffd700;
-    text-align: right;
+// View deduction history (optional feature)
+function viewDeductionHistory() {
+    const deductionLog = loadDeductionLog();
+    
+    if (deductionLog.length === 0) {
+        alert("No deductions have been made yet.");
+        return;
+    }
+    
+    const password = prompt("Enter teacher password to view deduction history:");
+    if (password !== MVP_PASSWORD) {
+        alert("Incorrect password.");
+        return;
+    }
+    
+    let historyText = `=== DEDUCTION HISTORY ===\n\n`;
+    deductionLog.forEach((entry, index) => {
+        const date = new Date(entry.date).toLocaleString();
+        historyText += `#${index + 1}: ${date}\n`;
+        historyText += `Standard: ${entry.standardName || 'Unknown'}\n`;
+        historyText += `Amount: -${entry.amount} 💰\n`;
+        historyText += `Reason: ${entry.reason}\n`;
+        historyText += `\n`;
+    });
+    
+    historyText += `\nTotal deducted across all standards: ${Object.values(standardDeductions).reduce((s, v) => s + v, 0)} 💰`;
+    historyText += `\nCurrent net balance: ${calculateTotalNetRewards()} 💰`;
+    
+    alert(historyText);
 }
 
-.standard-code {
-    font-family: monospace;
-    font-size: 1em;
-    color: #aaddff;
+// Initialize deduction system
+function initializeDeductionSystem() {
+    // Remove the old deduct button listener if it exists
+    const deductBtn = document.getElementById("deduct-rewards-btn");
+    if (deductBtn) {
+        // Replace with a message that deduction is now per-standard
+        deductBtn.addEventListener("click", () => {
+            alert("Please use the Deduct buttons in the Rewards overlay (click on 'Reward:' link in profile) to deduct from specific standards.");
+            
+            // Open rewards overlay to show the deduction buttons
+            openRewardsOverlay();
+        });
+    }
 }
 
-.standard-name {
-    font-size: 0.9em;
-    opacity: 0.9;
+// ==========================
+// UPDATE EXISTING FUNCTIONS
+// ==========================
+
+// Update recalculateAllQuestRewards to consider deductions
+function recalculateAllQuestRewards() {
+    console.log("=== Recalculating ALL quest rewards ===");
+    
+    // Clear existing rewards
+    questRewards = {};
+    
+    // Recalculate for all completed quests
+    Object.keys(completedQuests).forEach(qid => {
+        if (completedQuests[qid]) {
+            const coins = calculateQuestRewardCoins(qid);
+            questRewards[qid] = coins;
+        }
+    });
+    
+    saveQuestRewards();
+    refreshAllRewardDisplays();
+    console.log("Recalculation complete. Net rewards:", calculateTotalNetRewards());
 }
 
-.money-link {
-    color: inherit;
-    text-decoration: underline;
-    text-decoration-style: dotted;
-    cursor: pointer;
+// Update the DOMContentLoaded event listener to initialize the deduction system
+document.addEventListener("DOMContentLoaded", () => {
+    updateProfileUI();
+    recalculateAllQuestRewards();
+    
+    // Initialize deduction system
+    initializeDeductionSystem();
+    
+        // Load standard deductions
+    standardDeductions = loadStandardDeductions();
+    
+    // Update display with net totals
+    refreshAllRewardDisplays();
+});
+
+// Also update when profile is opened
+document.addEventListener("DOMContentLoaded", () => {
+    const profileBtn = document.getElementById("profile-btn");
+    const profileOverlay = document.getElementById("profile-overlay");
+    const profileClose = document.getElementById("profile-close");
+
+    if (!profileBtn || !profileOverlay || !profileClose) return;
+
+    profileBtn.addEventListener("click", () => {
+        // ... existing code ...
+        
+        profileOverlay.style.display = "flex";
+        ensureMVPColumnExists();
+        updateProfileStandardsTable();
+        renderRadarChart();
+        updateProfileUI();
+        showAvatarChangeUI();
+        updateProfileRewards(); // This now shows net rewards
+        
+        // ... existing code ...
+    });
+    
+    // ... rest of your existing code ...
+});
+
+// ==========================
+// REWARDS BY STANDARD SYSTEM (PROFILE VERSION)
+// ==========================
+
+// Calculate rewards per standard across ALL completed quests
+function calculateRewardsPerStandard() {
+    // Initialize totals for each standard
+    const standardTotals = {};
+    
+    // Initialize all standards with 0
+    Object.keys(STANDARD_NAMES).forEach(standard => {
+        standardTotals[standard] = 0;
+    });
+    
+    // Track which quests contributed to each standard
+    const standardSources = {};
+    Object.keys(STANDARD_NAMES).forEach(standard => {
+        standardSources[standard] = [];
+    });
+    
+    // Loop through all completed quests
+    Object.entries(completedQuests).forEach(([questId, isCompleted]) => {
+        if (!isCompleted) return;
+        
+        const quest = quests[questId];
+        if (!quest || !quest.rubric) return;
+        
+        // Determine which column to use (mvpGrade or grade)
+        const column = quest.style === "mvp" ? "mvpGrade" : "grade";
+        const grades = questGrades[questId]?.[column];
+        
+        if (!grades) return;
+        
+        // For each standard in this quest's rubric
+        quest.rubric.standards.forEach(std => {
+            const standardCode = std.code;
+            const grade = grades[standardCode];
+            
+            if (typeof grade === "number" && !isNaN(grade)) {
+                // Calculate coins for this standard (10 coins per grade point)
+                const coins = Math.round(grade * 10);
+                
+                // Add to standard total
+                if (standardTotals.hasOwnProperty(standardCode)) {
+                    standardTotals[standardCode] += coins;
+                    
+                    // Track source for potential detailed view
+                    standardSources[standardCode].push({
+                        questId,
+                        questTitle: quest.title,
+                        grade,
+                        coins
+                    });
+                }
+            }
+        });
+    });
+    
+    return {
+        totals: standardTotals,
+        sources: standardSources
+    };
 }
 
-.money-link:hover {
-    opacity: 0.8;
+// Calculate total rewards across all standards
+function calculateTotalAllStandards() {
+    const { totals } = calculateRewardsPerStandard();
+    return Object.values(totals).reduce((sum, val) => sum + val, 0);
+}
+
+// Open the rewards overlay
+function openRewardsOverlay() {
+    const overlay = document.getElementById("rewards-overlay");
+    if (!overlay) {
+        console.error("Rewards overlay not found!");
+        return;
+    }
+    
+    // Calculate rewards data
+    const { totals, sources } = calculateRewardsPerStandard();
+    const totalAll = Object.values(totals).reduce((sum, val) => sum + val, 0);
+    
+    // Update total summary
+    const totalSummary = document.getElementById("rewards-total-summary");
+    if (totalSummary) {
+        totalSummary.innerHTML = `Total Rewards: <strong>${totalAll} 💰</strong>`;
+    }
+    
+    // Render the table
+    renderRewardsTable(totals, sources);
+    
+    // Show overlay
+    overlay.style.display = "flex";
+}
+
+// Close the rewards overlay
+function closeRewardsOverlay() {
+    const overlay = document.getElementById("rewards-overlay");
+    if (overlay) {
+        overlay.style.display = "none";
+    }
+}
+
+// Render the rewards table
+// Update renderRewardsTable to show earned and net amounts
+function renderRewardsTable(totals, sources) {
+    const tableBody = document.getElementById("rewards-table-body");
+    if (!tableBody) return;
+    
+    tableBody.innerHTML = "";
+    
+    // Calculate net totals
+    const netTotals = calculateNetRewardsPerStandard();
+    
+    // Sort standards alphabetically for consistent display
+    const sortedStandards = Object.keys(STANDARD_NAMES).sort();
+    
+    sortedStandards.forEach(standardCode => {
+        const row = document.createElement("tr");
+        
+        // Standard code cell
+        const codeCell = document.createElement("td");
+        codeCell.className = "standard-code";
+        codeCell.textContent = standardCode;
+        
+        // Standard name cell
+        const nameCell = document.createElement("td");
+        nameCell.className = "standard-name";
+        nameCell.textContent = STANDARD_SHORT_NAMES[standardCode] || standardCode;
+        
+        // Earned amount cell
+        const earnedCell = document.createElement("td");
+        earnedCell.className = "reward-amount earned";
+        const earned = totals[standardCode] || 0;
+        earnedCell.innerHTML = `${earned} 💰`;
+        
+        // Deducted amount cell
+        const deductedCell = document.createElement("td");
+        deductedCell.className = "reward-amount deducted";
+        const deducted = standardDeductions[standardCode] || 0;
+        deductedCell.innerHTML = `-${deducted} 💰`;
+        
+        // Net amount cell
+        const netCell = document.createElement("td");
+        netCell.className = "reward-amount net";
+        const net = netTotals[standardCode] || 0;
+        netCell.innerHTML = `<strong>${net} 💰</strong>`;
+        
+        // Add deduction button
+        const actionCell = document.createElement("td");
+        actionCell.className = "reward-action";
+        const deductBtn = document.createElement("button");
+        deductBtn.className = "deduct-standard-btn";
+        deductBtn.textContent = "Deduct";
+        deductBtn.dataset.standard = standardCode;
+        deductBtn.dataset.maxDeduct = earned;
+        deductBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            deductFromStandard(standardCode, earned);
+        });
+        actionCell.appendChild(deductBtn);
+        
+        // Optional: Add quest count tooltip
+        const sourceCount = sources[standardCode]?.length || 0;
+        if (sourceCount > 0) {
+            row.title = `From ${sourceCount} quest${sourceCount !== 1 ? 's' : ''}`;
+        }
+        
+        row.appendChild(codeCell);
+        row.appendChild(nameCell);
+        row.appendChild(earnedCell);
+        row.appendChild(deductedCell);
+        row.appendChild(netCell);
+        row.appendChild(actionCell);
+        
+        tableBody.appendChild(row);
+    });
+    
+    // Add totals row
+    const totalRow = document.createElement("tr");
+    totalRow.style.backgroundColor = "rgba(0,30,180,0.5)";
+    totalRow.style.fontWeight = "bold";
+    
+    const totalLabelCell = document.createElement("td");
+    totalLabelCell.colSpan = 2;
+    totalLabelCell.textContent = "TOTALS";
+    totalLabelCell.style.textAlign = "right";
+    
+    const totalEarned = document.createElement("td");
+    totalEarned.className = "reward-amount";
+    totalEarned.innerHTML = `${Object.values(totals).reduce((s, v) => s + v, 0)} 💰`;
+    
+    const totalDeducted = document.createElement("td");
+    totalDeducted.className = "reward-amount deducted";
+    totalDeducted.innerHTML = `-${Object.values(standardDeductions).reduce((s, v) => s + v, 0)} 💰`;
+    
+    const totalNet = document.createElement("td");
+    totalNet.className = "reward-amount net";
+    totalNet.innerHTML = `<strong>${calculateTotalNetRewards()} 💰</strong>`;
+    
+    const emptyCell = document.createElement("td");
+    
+    totalRow.appendChild(totalLabelCell);
+    totalRow.appendChild(totalEarned);
+    totalRow.appendChild(totalDeducted);
+    totalRow.appendChild(totalNet);
+    totalRow.appendChild(emptyCell);
+    
+    tableBody.appendChild(totalRow);
+}
+
+// Initialize rewards overlay event listeners
+function initializeRewardsOverlay() {
+    // Get elements
+    const rewardLink = document.getElementById("profile-reward-link");
+    const closeBtn = document.getElementById("close-rewards");
+    const overlay = document.getElementById("rewards-overlay");
+    
+    if (rewardLink) {
+        rewardLink.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Update profile rewards first to ensure data is fresh
+            updateProfileRewards();
+            
+            // Open the rewards overlay
+            openRewardsOverlay();
+        });
+    }
+    
+    if (closeBtn) {
+        closeBtn.addEventListener("click", closeRewardsOverlay);
+    }
+    
+    if (overlay) {
+        // Close when clicking outside the rewards box
+        overlay.addEventListener("click", (e) => {
+            if (e.target === overlay) {
+                closeRewardsOverlay();
+            }
+        });
+    }
+    
+    // Close on Escape key
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && overlay && overlay.style.display === "flex") {
+            closeRewardsOverlay();
+        }
+    });
+}
+
+
+// ==========================
+// PROFILE LOGIC
+// ==========================
+document.addEventListener("DOMContentLoaded", () => {
+
+  const profileBtn = document.getElementById("profile-btn");
+  const profileOverlay = document.getElementById("profile-overlay");
+  const profileClose = document.getElementById("profile-close");
+
+  if (!profileBtn || !profileOverlay || !profileClose) return;
+
+  profileBtn.addEventListener("click", () => {
+    document.getElementById("change-avatar-btn")?.addEventListener("click", () => {
+      // show setup overlay but skip name step
+      document.getElementById("student-setup-overlay").style.display = "flex";
+      document.getElementById("student-name-input").style.display = "none";
+      document.getElementById("student-name-submit").style.display = "none";
+      document.getElementById("character-selection").style.display = "block";
+      document.getElementById("student-setup-overlay").classList.add("hide-setup-text");
+
+      loadCharacterSelectionForProfile(document.getElementById("characters-list"));
+      //=============================================reward=====================================
+      updateProfileRewards();
+    });
+
+    profileOverlay.style.display = "flex";
+    ensureMVPColumnExists();
+    updateProfileStandardsTable();
+    renderRadarChart();
+    updateProfileUI();
+    showAvatarChangeUI();
+    updateProfileRewards();
+  });
+
+  profileClose.addEventListener("click", () => {
+    profileOverlay.style.display = "none";
+  });
+
+  profileOverlay.addEventListener("click", (e) => {
+    if (e.target === profileOverlay) {
+      profileOverlay.style.display = "none";
+    }
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && profileOverlay.style.display === "flex") {
+      profileOverlay.style.display = "none";
+    }
+  });
+});
+//=============================================================================================================
+//  REWARD SYSTEM
+//=============================================================================================================
+function saveQuestRewards() {
+  localStorage.setItem("questRewards", JSON.stringify(questRewards));
+}
+
+function loadQuestRewards() {
+  const data = localStorage.getItem("questRewards");
+  return data ? JSON.parse(data) : {};
+}
+// ============================REWARD MATH =================================
+function calculateQuestRewardCoins(questId) {
+  // Return 0 if quest is not completed
+  if (!completedQuests[questId]) {
+    console.log(`Quest ${questId} not completed, returning 0`);
+    return 0;
+  }
+  
+  const quest = quests[questId];
+  if (!quest || !quest.rubric) {
+    console.log(`Quest ${questId} has no rubric, returning 0`);
+    return 0;
+  }
+
+  const column = quest.style === "mvp" ? "mvpGrade" : "grade";
+  const grades = questGrades[questId]?.[column];
+  
+  // If no grades exist yet, return 0 (even if completed)
+  if (!grades || Object.keys(grades).length === 0) {
+    console.log(`Quest ${questId} has no grades, returning 0`);
+    return 0;
+  }
+
+  let totalCoins = 0;
+  console.log(`Calculating coins for ${questId}:`, grades);
+
+  Object.values(grades).forEach(val => {
+    if (typeof val === "number" && !isNaN(val)) {
+      // Each grade point is worth 10 coins, sum them up
+      totalCoins += Math.round(val * 10);
+    }
+  });
+
+  console.log(`Quest ${questId} total coins: ${totalCoins}`);
+  return totalCoins;
+}
+
+// ==========================
+// AVATAR CHANGE UI
+// ==========================
+function showAvatarChangeUI() {
+  const profileLeft = document.querySelector(".profile-left");
+  if (!profileLeft) return;
+
+  // If already exists, skip
+  if (document.getElementById("avatar-change-container")) return;
+
+  const container = document.createElement("div");
+  container.id = "avatar-change-container";
+  container.style.marginTop = "10px";
+
+  profileLeft.appendChild(container);
+
+  document.getElementById("change-avatar-btn").addEventListener("click", () => {
+    const selection = document.getElementById("avatar-selection");
+    selection.style.display = selection.style.display === "none" ? "block" : "none";
+
+    if (selection.innerHTML.trim() === "") {
+      loadCharacterSelectionForProfile(selection);
+    }
+  });
+}
+
+function loadCharacterSelectionForProfile(container) {
+  fetch("characters/characters.json")
+    .then(res => res.json())
+    .then(characters => {
+      container.innerHTML = "";
+
+      characters.forEach(charFile => {
+        const img = document.createElement("img");
+        img.src = "characters/" + charFile;
+        img.classList.add("character-img");
+        img.style.cursor = "pointer";
+
+        img.addEventListener("click", () => {
+          const profile = loadStudentProfile() || {};
+          profile.character = "characters/" + charFile;
+          saveStudentProfile(profile);
+          updateProfileUI();
+
+          // close overlay
+          document.getElementById("student-setup-overlay").style.display = "none";
+        });
+
+        container.appendChild(img);
+      });
+    })
+    .catch(err => console.error("Failed to load characters.json:", err));
+}
+
+// ==========================
+// MVP GRADE LOGIC
+// ==========================
+function computeStandardAverage(isMVP, standardCode) {
+  let sum = 0;
+  let count = 0;
+
+  for (const qid in questGrades) {
+    const quest = quests[qid];
+    if (!quest) continue;
+
+    // Only include completed quests
+    if (!completedQuests[qid]) continue;
+
+    // Ensure we are counting only MVP or non-MVP quests
+    if (isMVP && quest.style !== "mvp") continue;
+    if (!isMVP && quest.style === "mvp") continue;
+
+    const column = isMVP ? "mvpGrade" : "grade";
+    const raw = questGrades[qid]?.[column]?.[standardCode];
+
+    if (raw !== null && raw !== undefined && !isNaN(raw)) {
+      sum += raw;
+      count++;
+    }
+  }
+
+  return count ? (sum / count) : "";
+}
+
+// ==========================
+// PROFILE GRADE AVERAGE
+// ==========================
+function ensureMVPColumnExists() {
+  const table = document.getElementById("standards-table");
+  if (!table) return;
+
+  const headerRow = table.querySelector("thead tr");
+  if (!headerRow) return;
+
+  // If MVP header is missing, add it
+  if (!headerRow.querySelector(".mvp-header")) {
+    const th = document.createElement("th");
+    th.className = "mvp-header";
+    th.innerText = "MVP Grade";
+    headerRow.appendChild(th);
+  }
+
+  // Ensure each row has MVP cell
+  const rows = table.querySelectorAll("tbody tr");
+  rows.forEach(row => {
+    if (!row.querySelector(".mvp-cell")) {
+      const td = document.createElement("td");
+      td.className = "mvp-cell";
+      td.innerText = "";
+      row.appendChild(td);
+    }
+  });
+}
+
+function updateProfileStandardsTable() {
+  ensureMVPColumnExists();
+
+  const rows = document.querySelectorAll("#standards-table tbody tr");
+
+  rows.forEach(row => {
+    const standardCode = row.dataset.standard;
+
+    const gradeAvg = computeStandardAverage(false, standardCode);
+    const mvpAvg = computeStandardAverage(true, standardCode);
+
+    row.children[1].innerText = gradeAvg ? gradeAvg.toFixed(2) : "";
+
+    const mvpCell = row.querySelector(".mvp-cell");
+    if (mvpCell) {
+      mvpCell.innerText = mvpAvg ? mvpAvg.toFixed(2) : "";
+    }
+  });
+}
+
+// ==========================
+// RADAR CHART
+// ==========================
+const radarDescriptions = {
+  creating: "Creating: Generating ideas and creating art through experimentation and planning.",
+  presenting: "Presenting: Sharing and presenting art with intentional choices and reflection.",
+  responding: "Responding: Interpreting and evaluating art using reasoning and evidence.",
+  connecting: "Connecting: Making connections between art, culture, and personal experiences."
+};
+
+function computeMvpDomainGrades() {
+  const mvpStandards = {
+    creating: [
+      "Art.FA.CR.1.1.IA",
+      "Art.FA.CR.1.2.IA",
+      "Art.FA.CR.2.1.IA",
+      "Art.FA.CR.2.3.IA",
+      "Art.FA.CR.3.1.IA"
+    ],
+    presenting: ["Art.FA.PR.6.1.IA"],
+    responding: ["Art.FA.RE.8.1.8A"],
+    connecting: ["Art.FA.CN.10.1.IA"]
+  };
+
+  const domainGrades = {};
+
+  for (const domain in mvpStandards) {
+    let sum = 0;
+    let count = 0;
+
+    mvpStandards[domain].forEach(code => {
+      const avg = computeStandardAverage(true, code);
+
+      // ✅ ONLY include standards that were actually assessed
+      if (typeof avg === "number" && !isNaN(avg)) {
+        sum += avg;
+        count++;
+      }
+    });
+
+    domainGrades[domain] = count ? sum / count : 0;
+  }
+
+  return domainGrades;
+}
+
+function renderRadarChart() {
+  const canvas = document.getElementById("radar-chart");
+  const tooltip = document.getElementById("radar-tooltip");
+  if (!canvas) return;
+
+  const ctx = canvas.getContext("2d");
+
+  const radarData = computeMvpDomainGrades();
+  const labels = ["creating", "presenting", "responding", "connecting"];
+  const values = labels.map(l => radarData[l]);
+
+  const size = 350;
+  canvas.width = size;
+  canvas.height = size;
+
+  const centerX = size / 2;
+  const centerY = size / 2;
+  const maxRadius = 110;
+  const steps = 4;
+
+  ctx.clearRect(0, 0, size, size);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.45)";
+  ctx.lineWidth = 1;
+
+  for (let s = 1; s <= steps; s++) {
+    ctx.beginPath();
+    const r = (maxRadius / steps) * s;
+    for (let i = 0; i < labels.length; i++) {
+      const angle = (Math.PI * 2 / labels.length) * i - Math.PI / 2;
+      const x = centerX + r * Math.cos(angle);
+      const y = centerY + r * Math.sin(angle);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  for (let i = 0; i < labels.length; i++) {
+    const angle = (Math.PI * 2 / labels.length) * i - Math.PI / 2;
+    const x = centerX + maxRadius * Math.cos(angle);
+    const y = centerY + maxRadius * Math.sin(angle);
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 14px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const labelPositions = [];
+  for (let i = 0; i < labels.length; i++) {
+    const angle = (Math.PI * 2 / labels.length) * i - Math.PI / 2;
+    const x = centerX + (maxRadius + 22) * Math.cos(angle);
+    const y = centerY + (maxRadius + 22) * Math.sin(angle);
+
+    ctx.fillText(labels[i].charAt(0).toUpperCase() + labels[i].slice(1), x, y);
+    labelPositions.push({ x, y, label: labels[i] });
+  }
+
+  // Create hover zones for labels
+  const labelZones = labelPositions.map(lp => {
+    ctx.font = "bold 14px Arial";
+    const text = lp.label.charAt(0).toUpperCase() + lp.label.slice(1);
+    const textWidth = ctx.measureText(text).width;
+
+    return {
+      label: lp.label,
+      x: lp.x,
+      y: lp.y,
+      width: textWidth,
+      height: 16
+    };
+  });
+
+  ctx.beginPath();
+  for (let i = 0; i < values.length; i++) {
+    const angle = (Math.PI * 2 / labels.length) * i - Math.PI / 2;
+    const r = (values[i] / 4) * maxRadius;
+    const x = centerX + r * Math.cos(angle);
+    const y = centerY + r * Math.sin(angle);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#fff";
+  const pointPositions = [];
+  values.forEach((val, i) => {
+    const angle = (Math.PI * 2 / labels.length) * i - Math.PI / 2;
+    const r = (val / 4) * maxRadius;
+    const x = centerX + r * Math.cos(angle);
+    const y = centerY + r * Math.sin(angle);
+
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fill();
+    pointPositions.push({ x, y, label: labels[i] });
+  });
+
+  canvas.onmousemove = (e) => {
+    const container = document.getElementById("radar-chart-container");
+    const rect = container.getBoundingClientRect();
+
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    let found = false;
+
+    for (const pt of pointPositions) {
+      const dist = Math.hypot(mouseX - pt.x, mouseY - pt.y);
+      if (dist < 10) {
+        tooltip.innerText = radarDescriptions[pt.label];
+        tooltip.style.opacity = 1;
+        tooltip.style.left = (mouseX + 15) + "px";
+        tooltip.style.top = (mouseY - 25) + "px";
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      for (const lbl of labelPositions) {
+        const dist = Math.hypot(mouseX - lbl.x, mouseY - lbl.y);
+        if (dist < 40) {
+          tooltip.innerText = radarDescriptions[lbl.label];
+          tooltip.style.opacity = 1;
+          tooltip.style.left = (mouseX + 15) + "px";
+          tooltip.style.top = (mouseY - 25) + "px";
+          found = true;
+          break;
+        }
+      }
+    }
+
+    if (!found) {
+      tooltip.style.opacity = 0;
+    }
+  };
+}
+
+// ==========================
+// GRADES STORAGE
+// ==========================
+function saveQuestGrades() {
+  localStorage.setItem("questGrades", JSON.stringify(questGrades));
+}
+
+function loadQuestGrades() {
+  const data = localStorage.getItem("questGrades");
+  return data ? JSON.parse(data) : {};
+}
+
+// ==========================
+// TIMER FUNCTIONS
+// ==========================
+function saveQuestStartTimes() {
+  localStorage.setItem("questStartTimes", JSON.stringify(questStartTimes));
+}
+
+function loadQuestStartTimes() {
+  const data = localStorage.getItem("questStartTimes");
+  return data ? JSON.parse(data) : {};
+}
+
+function saveQuestAccepted() {
+  localStorage.setItem("questAccepted", JSON.stringify(questAccepted));
+}
+
+function loadQuestAccepted() {
+  const data = localStorage.getItem("questAccepted");
+  return data ? JSON.parse(data) : {};
+}
+
+function formatTime(minutes, showClasses = true) {
+  if (showClasses) {
+    // Show classes first, then detailed time
+    const classes = minutes / 75;
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.floor(minutes % 60);
+    const secs = Math.floor((minutes * 60) % 60);
+    
+    if (classes >= 1) {
+      const wholeClasses = Math.floor(classes);
+      const remainingMinutes = Math.round((classes - wholeClasses) * 75);
+      
+      if (wholeClasses > 0 && remainingMinutes > 0) {
+        return `${wholeClasses} ${wholeClasses === 1 ? 'class' : 'classes'} ${remainingMinutes}m`;
+      } else if (wholeClasses > 0) {
+        return `${wholeClasses} ${wholeClasses === 1 ? 'class' : 'classes'}`;
+      } else {
+        return `${remainingMinutes}m`;
+      }
+    }
+  }
+    const hours = Math.floor(minutes / 60);
+  const mins = Math.floor(minutes % 60);
+  const secs = Math.floor((minutes * 60) % 60);
+  
+  if (hours > 0) {
+    return `${hours}h ${mins}m ${secs}s`;
+  }
+  return `${mins}m ${secs}s`;
+}
+
+function initializeQuestTimers() {
+  // Start timers for all accepted quests
+  for (const questId in questAccepted) {
+    if (questAccepted[questId] && questStartTimes[questId]) {
+      startQuestTimer(questId);
+    }
+  }
+}
+
+function updateTimerDisplay(questId) {
+  if (!questStartTimes[questId]) return;
+  
+  const quest = quests[questId];
+  if (!quest || !quest.timer) return;
+  
+  // NEW: Calculate remaining minutes based on school days (every other weekday)
+  const startTime = new Date(questStartTimes[questId]);
+  const now = new Date();
+  
+  // Calculate calendar days difference
+  const diffTime = Math.abs(now - startTime);
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  
+  // Count only weekdays in that period
+  let weekdaysCount = 0;
+  const currentDate = new Date(startTime);
+  
+  for (let i = 0; i <= diffDays; i++) {
+    const dayOfWeek = currentDate.getDay();
+    // 0 = Sunday, 6 = Saturday
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      weekdaysCount++;
+    }
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  
+  // Each class period is every OTHER weekday (every 2 school days)
+  const classPeriodsElapsed = Math.floor(weekdaysCount / 2);
+  const minutesPerClass = 75;
+  const elapsedMinutes = classPeriodsElapsed * minutesPerClass;
+  const remainingMinutes = Math.max(0, quest.timer.allottedMinutes - elapsedMinutes);
+  
+  const timerDisplay = document.getElementById("timer-display");
+  const questBox = document.getElementById("quest-box");
+  
+  if (timerDisplay && questBox && currentQuestId === questId) {
+    timerDisplay.textContent = formatTime(remainingMinutes, true);
+    
+    // Update quest box styling based on time remaining
+    const warningThreshold = quest.timer.allottedMinutes * 0.3; // 30% of allotted time
+    
+    if (remainingMinutes <= 0) {
+      questBox.classList.add("times-up");
+      questBox.classList.remove("warning");
+      timerDisplay.textContent = "TIME'S UP!";
+    } else if (remainingMinutes <= warningThreshold) {
+      questBox.classList.add("warning");
+      questBox.classList.remove("times-up");
+    } else {
+      questBox.classList.remove("warning", "times-up");
+    }
+  }
+    
+  // Save updated remaining time for persistence
+  return remainingMinutes;
+}
+
+function startQuestTimer(questId) {
+  // Clear any existing timer for this quest
+  if (questTimers[questId]) {
+    clearInterval(questTimers[questId]);
+  }
+  
+  // Start new timer
+  questTimers[questId] = setInterval(() => {
+    const remaining = updateTimerDisplay(questId);
+    if (remaining <= 0) {
+      stopQuestTimer(questId);
+    }
+  }, 1000); // Update every second
+  
+  // Initial update
+  updateTimerDisplay(questId);
+}
+
+function stopQuestTimer(questId) {
+  if (questTimers[questId]) {
+    clearInterval(questTimers[questId]);
+    delete questTimers[questId];
+  }
+}
+
+function acceptQuest(questId) {
+  const quest = quests[questId];
+  if (!quest || !quest.timer) return;
+
+  const minutes = quest.timer.allottedMinutes;                                    //-----------------------
+  const classesDisplay = convertMinutesToClasses(minutes);                        //-----------------------
+  
+  if (confirm(`Accept "${quest.title}"?\n\nYou will have ${formatTime(quest.timer.allottedMinutes, true)} to complete this quest.`)) {
+    // Mark quest as accepted
+    questAccepted[questId] = true;
+    questStartTimes[questId] = new Date().toISOString();
+    
+    saveQuestAccepted();
+    saveQuestStartTimes();
+    
+    // Update UI
+    const acceptBtn = document.getElementById("quest-accept");
+    if (acceptBtn) {
+      acceptBtn.disabled = true;
+      acceptBtn.textContent = "Accepted";
+    }
+    
+    // Show timer display
+    const timerDisplay = document.getElementById("timer-display");
+    if (timerDisplay) {
+      timerDisplay.style.display = "block";
+    }
+    
+    // Start the timer
+    startQuestTimer(questId);
+    
+    // Save to localStorage
+    saveQuestData();
+  }
+}
+
+function resetQuestTimer(questId) {
+  // Clear saved data
+  delete questStartTimes[questId];
+  delete questAccepted[questId];
+  
+  saveQuestStartTimes();
+  saveQuestAccepted();
+  
+  // Stop the timer
+  stopQuestTimer(questId);
+  
+  // Reset UI
+  const questBox = document.getElementById("quest-box");
+  if (questBox && currentQuestId === questId) {
+    questBox.classList.remove("warning", "times-up");
+  }
+  
+  const timerDisplay = document.getElementById("timer-display");
+  if (timerDisplay && currentQuestId === questId) {
+    timerDisplay.textContent = "";
+    timerDisplay.style.display = "none";
+  }
+  
+  const acceptBtn = document.getElementById("quest-accept");
+  if (acceptBtn && currentQuestId === questId) {
+    acceptBtn.disabled = false;
+    acceptBtn.textContent = "Accept Quest";
+  }
+  
+  const questCheck = document.getElementById("quest-check");
+  if (questCheck && currentQuestId === questId) {
+    questCheck.disabled = false;
+    questCheck.title = "";
+  }
+}
+
+function setupTimerControls(questId) {
+  const quest = quests[questId];
+  const acceptBtn = document.getElementById("quest-accept");
+  const timerDisplay = document.getElementById("timer-display");
+  
+  if (!quest || !acceptBtn || !timerDisplay) return;
+  
+  // Setup accept button
+  if (quest.timer) {
+    acceptBtn.style.display = "block";
+    
+    // Check if quest is already accepted
+    if (questAccepted[questId]) {
+      acceptBtn.disabled = true;
+      acceptBtn.textContent = "Accepted";
+      timerDisplay.style.display = "block";
+      
+      // Start timer if not already running
+      if (!questTimers[questId] && questStartTimes[questId]) {
+        startQuestTimer(questId);
+      }
+    } else {
+      acceptBtn.disabled = false;
+      acceptBtn.textContent = "Accept Quest";
+      timerDisplay.style.display = "none";
+    }
+    
+    // Remove any existing event listener
+    const newAcceptBtn = acceptBtn.cloneNode(true);
+    acceptBtn.parentNode.replaceChild(newAcceptBtn, acceptBtn);
+    
+    // Add new event listener
+    newAcceptBtn.addEventListener("click", () => {
+      if (!questAccepted[questId]) {
+        acceptQuest(questId);
+      }
+    });
+  } else {
+    // Hide accept button and timer for quests without timer
+    acceptBtn.style.display = "none";
+    timerDisplay.style.display = "none";
+    document.getElementById("quest-box").classList.add("no-timer");
+  }
+  
+  // ALWAYS ensure checkbox is enabled initially
+  const questCheck = document.getElementById("quest-check");
+  if (questCheck) {
+    questCheck.disabled = false; // Ensure checkbox is not disabled by timer
+    questCheck.title = "";
+  }
+}
+// ==========================
+// WORK OVERLAY FUNCTIONS
+// ==========================
+
+function openWorkOverlay(questId) {
+  const overlay = document.getElementById("work-overlay");
+  if (!overlay) {
+    console.error("Work overlay element not found!");
+    return;
+  }
+
+  // Use currentQuestId if no questId is provided
+  const targetQuestId = questId || currentQuestId;
+  
+  if (!targetQuestId) {
+    console.error("No quest ID available to open work overlay");
+    return;
+  }
+
+  console.log(`Opening work overlay for quest: ${targetQuestId}`);
+  
+  overlay.style.display = "flex";
+  overlay.dataset.questId = targetQuestId;
+
+  // Clear ALL form fields first to prevent showing previous quest's data
+  document.getElementById("work-title").value = "";
+  document.getElementById("work-size").value = "";
+  document.getElementById("work-media").value = "";
+  document.getElementById("work-description").value = "";
+  
+  const preview = document.getElementById("image-preview");
+  if (preview) {
+    preview.src = "";
+    preview.style.display = "none";
+  }
+
+  // Load saved data if exists for THIS SPECIFIC quest
+  if (studentWorks && studentWorks[targetQuestId]) {
+    const work = studentWorks[targetQuestId];
+
+    document.getElementById("work-title").value = work.title || "";
+    document.getElementById("work-size").value = work.size || "";
+    document.getElementById("work-media").value = work.media || "";
+    document.getElementById("work-description").value = work.description || "";
+
+    if (work.image && preview) {
+      preview.src = work.image;
+      preview.style.display = "block";
+    }
+  }
+  
+  // Clear the file input
+  const imageInput = document.getElementById("work-image");
+  if (imageInput) {
+    imageInput.value = "";
+  }
+}
+
+function closeWorkOverlay() {
+  const overlay = document.getElementById("work-overlay");
+  if (!overlay) return;
+  overlay.style.display = "none";
+}
+
+function saveWorkData() {
+  const overlay = document.getElementById("work-overlay");
+  const questId = overlay.dataset.questId;
+  
+  if (!questId) {
+    alert("Error: No quest associated with this work.");
+    return;
+  }
+
+  // Get image preview source
+  const preview = document.getElementById("image-preview");
+  const imageSrc = preview && preview.src ? preview.src : "";
+
+  // FIX: Use the correct ID names from your HTML
+  studentWorks[questId] = {
+    title: document.getElementById("work-title").value,
+    size: document.getElementById("work-size").value,        
+    media: document.getElementById("work-media").value,      
+    description: document.getElementById("work-description").value,
+    image: imageSrc,
+    lastModified: new Date().toISOString()
+  };
+
+  saveStudentWorks();
+  const galleryOverlay = document.getElementById("gallery-overlay");
+  if (galleryOverlay && galleryOverlay.style.display === "flex") {
+    renderGalleryItems();
+  }
+  
+  alert("🎨 Work saved successfully!");
+}
+
+// ============================================
+// JSON PROFILE SAVE/LOAD SYSTEM
+// ============================================
+
+// 1. COLLECT ALL STUDENT DATA
+function collectStudentData() {
+    const studentProfile = loadStudentProfile() || {
+        name: document.getElementById('student-name')?.textContent || 'Unnamed Artist',
+        character: document.getElementById('student-avatar')?.src || 'profile.png'
+    };
+    
+    const studentData = {
+        // Basic student info
+        name: studentProfile.name,
+        character: studentProfile.character,
+        studentProfile: studentProfile, // Save the full profile object
+        timestamp: new Date().toISOString(),
+        
+        // Your existing completion data
+        completedQuests: completedQuests,
+        
+        // Your existing grading data
+        questGrades: questGrades,
+        
+        // Your existing rubric locks
+        rubricLocked: rubricLocked,
+        
+        // Timer data
+        questAccepted: questAccepted,
+        questStartTimes: questStartTimes,
+        
+        // student work data
+        works: studentWorks,
+        
+        // Quest rewards
+        questRewards: questRewards,
+        
+        // Standard deductions
+        standardDeductions: standardDeductions,
+        
+        // Collect art standards
+        standards: {},
+        
+        // Metadata
+        appName: "Artheim",
+        version: "1.0",
+        exportDate: new Date().toLocaleString()
+    };
+    
+    // Collect art standards from the table
+    document.querySelectorAll('#standards-table tbody tr').forEach(row => {
+        const standard = row.getAttribute('data-standard');
+        const gradeCell = row.children[1];
+        const mvpCell = row.querySelector('.mvp-cell');
+        
+        if (standard) {
+            studentData.standards[standard] = {
+                regular: gradeCell?.textContent.trim() || '',
+                mvp: mvpCell?.textContent.trim() || ''
+            };
+        }
+    });
+    
+    return studentData;
+}
+
+// 2. SAVE PROFILE AS JSON FILE
+function saveProfileAsJSON() {
+    const studentData = collectStudentData();
+    
+    // Format JSON nicely
+    const jsonString = JSON.stringify(studentData, null, 2);
+    
+    // Create download link
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    // Create filename with student name and date
+    const studentName = document.getElementById('student-name')?.textContent || 'Student';
+    const sanitizedName = studentName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    const link = document.createElement('a');
+    link.download = `Artheim-${sanitizedName}-${dateStr}.json`;
+    link.href = url;
+    link.click();
+    
+    // Clean up
+    URL.revokeObjectURL(url);
+    
+    // Show success message
+    const completedCount = Object.values(studentData.completedQuests || {}).filter(v => v).length;
+    const gradedCount = Object.keys(studentData.questGrades || {}).length;
+    
+    alert(`✅ Profile saved successfully!\n\nFilename: ${link.download}\nCompleted quests: ${completedCount}\nGraded quests: ${gradedCount}\n\nSave this file to backup your progress.`);
+}
+
+// 3. LOAD PROFILE FROM JSON FILE
+function loadProfileFromJSON(file) {
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+        try {
+            const jsonString = e.target.result;
+            const studentData = JSON.parse(jsonString);
+            
+            // Validate the file
+            if (!studentData.appName || studentData.appName !== "Artheim") {
+                throw new Error('This is not a valid Artheim profile file.');
+            }
+            
+            // Show confirmation with stats
+            const completedCount = Object.values(studentData.completedQuests || {}).filter(v => v).length;
+            const gradedCount = Object.keys(studentData.questGrades || {}).length;
+            
+            if (confirm(`Load profile for "${studentData.name}"?\n\nCompleted quests: ${completedCount}\nGraded quests: ${gradedCount}\nExport date: ${studentData.exportDate || 'Unknown'}\n\nThis will OVERRIDE all current progress and grades.`)) {
+                loadStudentData(studentData);
+            }
+            
+        } catch (error) {
+            console.error('Error loading profile:', error);
+            alert('Error loading profile: ' + error.message);
+        }
+    };
+    
+    reader.onerror = function() {
+        alert('Error reading file. Please try again.');
+    };
+    
+    reader.readAsText(file);
+}
+
+// 4. LOAD STUDENT DATA INTO THE SYSTEM
+function loadStudentData(data) {
+    console.log("Loading student data:", data);
+    
+    // Load basic student info
+    if (data.name) {
+        const nameElement = document.getElementById("student-name");
+        if (nameElement) nameElement.innerText = data.name;
+        
+        // Save to studentProfile in localStorage
+        const profile = loadStudentProfile() || {};
+        profile.name = data.name;
+        if (data.character) profile.character = data.character;
+        saveStudentProfile(profile);
+    }
+    
+    if (data.character) {
+        const avatar = document.getElementById("student-avatar");
+        if (avatar) avatar.src = data.character;
+        
+        // Update profile button avatar
+        const profileBtn = document.querySelector(".profile-btn img");
+        if (profileBtn) profileBtn.src = data.character;
+        
+        // Save to studentProfile in localStorage
+        const profile = loadStudentProfile() || {};
+        profile.character = data.character;
+        if (data.name) profile.name = data.name;
+        saveStudentProfile(profile);
+    }
+    
+    // If the data has a full studentProfile object, use that instead
+    if (data.studentProfile) {
+        saveStudentProfile(data.studentProfile);
+    }
+    
+    // Load standard deductions if present
+    if (data.standardDeductions) {
+        standardDeductions = data.standardDeductions;
+        saveStandardDeductions();
+        console.log("Loaded standard deductions:", standardDeductions);
+    } else {
+        // Reset to empty if not present
+        standardDeductions = {};
+        saveStandardDeductions();
+    }
+    
+    // Load completed quests - update the global variable
+    if (data.completedQuests) {
+        // Clear current completions
+        for (const key in completedQuests) {
+            delete completedQuests[key];
+        }
+        
+        // Load new completions
+        Object.assign(completedQuests, data.completedQuests);
+        saveQuestData();
+        console.log("Loaded completed quests:", completedQuests);
+    }
+    
+    // Load quest grades - update the global variable
+    if (data.questGrades) {
+        // Clear current grades
+        for (const key in questGrades) {
+            delete questGrades[key];
+        }
+        
+        // Load new grades
+        Object.assign(questGrades, data.questGrades);
+        saveQuestGrades();
+        console.log("Loaded quest grades:", questGrades);
+    }
+    
+    // Load rubric locks - update the global variable
+    if (data.rubricLocked) {
+        // Clear current locks
+        for (const key in rubricLocked) {
+            delete rubricLocked[key];
+        }
+        
+        // Load new locks
+        Object.assign(rubricLocked, data.rubricLocked);
+        saveRubricLocks();
+    }
+    
+    // Load timer data - update global variables
+    if (data.questAccepted) {
+        // Clear current accepted
+        for (const key in questAccepted) {
+            delete questAccepted[key];
+        }
+        
+        // Load new accepted
+        Object.assign(questAccepted, data.questAccepted);
+        saveQuestAccepted();
+    }
+    
+    if (data.questStartTimes) {
+        // Clear current start times
+        for (const key in questStartTimes) {
+            delete questStartTimes[key];
+        }
+        
+        // Load new start times
+        Object.assign(questStartTimes, data.questStartTimes);
+        saveQuestStartTimes();
+    }
+    
+    // Load student works - update global variable
+    if (data.works) {
+        // Clear current works
+        for (const key in studentWorks) {
+            delete studentWorks[key];
+        }
+        
+        // Load new works
+        Object.assign(studentWorks, data.works);
+        saveStudentWorks();
+        console.log("Loaded student works:", studentWorks);
+    }
+    
+    // Load quest rewards - update global variable
+    if (data.questRewards) {
+        // Clear current rewards
+        for (const key in questRewards) {
+            delete questRewards[key];
+        }
+        
+        // Load new rewards
+        Object.assign(questRewards, data.questRewards);
+        saveQuestRewards();
+    }
+    
+    // Load art standards into the table
+    if (data.standards) {
+        Object.entries(data.standards).forEach(([standard, grades]) => {
+            const row = document.querySelector(`tr[data-standard="${standard}"]`);
+            if (row) {
+                const gradeCell = row.children[1];
+                const mvpCell = row.querySelector('.mvp-cell');
+                
+                if (gradeCell && grades.regular) {
+                    gradeCell.textContent = grades.regular;
+                }
+                if (mvpCell && grades.mvp) {
+                    mvpCell.textContent = grades.mvp;
+                }
+            }
+        });
+    }
+    
+    // IMPORTANT: Recalculate rewards after loading all data
+    recalculateAllQuestRewards();
+    
+    // Refresh all displays
+    updateProfileUI();
+    updateProfileStandardsTable();
+    renderRadarChart();
+    renderCompletedQuests();
+    renderAchievementsList();
+    updateProfileRewards();
+    initializeQuestTimers();
+    
+    // Show success message
+    setTimeout(() => {
+        const completedCount = Object.values(completedQuests).filter(v => v).length;
+        const gradedCount = Object.keys(questGrades).length;
+        const worksCount = Object.keys(studentWorks).length;
+        
+        alert(`✅ Profile for "${data.name || 'Student'}" loaded successfully!\n\nCompleted quests: ${completedCount}\nGraded quests: ${gradedCount}\nSaved works: ${worksCount}\n\nYour progress has been restored.`);
+        
+        // Close profile overlay if open
+        const profileOverlay = document.getElementById('profile-overlay');
+        if (profileOverlay) profileOverlay.style.display = 'none';
+    }, 300);
+}
+// 5. CREATE PROFILE MANAGEMENT UI
+function createProfileManagementUI() {
+    // Add event listeners
+    document.getElementById('save-profile-btn').addEventListener('click', saveProfileAsJSON);
+    
+    const fileInput = document.getElementById('load-profile-input');
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            loadProfileFromJSON(file);
+            fileInput.value = ''; // Clear input
+        }
+    });
+}
+
+// 6. ADD STYLES
+function addProfileManagementStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+        .profile-buttons button:hover {
+            background: #A0522D !important;
+            transform: scale(1.02);
+            transition: all 0.3s;
+        }
+        
+        .profile-buttons label:hover {
+            background: #A0522D !important;
+            transform: scale(1.02);
+            transition: all 0.3s;
+        }
+        
+        .qr-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(139, 69, 19, 0.1);
+            border-radius: 8px;
+            border: 1px solid #8B4513;
+        }
+        
+        .qr-section h3 {
+            margin-top: 0;
+            color: #8B4513;
+            text-align: center;
+        }
+        
+        /* You can remove QR scanner overlay styles since we're not using QR */
+        #qr-scanner-overlay {
+            display: none !important;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// 7. INITIALIZE PROFILE MANAGEMENT
+function initializeProfileManagement() {
+    addProfileManagementStyles();
+    
+    // Wait a bit for DOM to be ready
+    setTimeout(() => {
+        createProfileManagementUI();
+        console.log('Profile management system initialized');
+    }, 500);
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    initializeProfileManagement();
+});
+
+// Make functions available globally for debugging
+window.ArtheimProfile = {
+    saveProfileAsJSON,
+    loadProfileFromJSON,
+    collectStudentData,
+    loadStudentData
+};
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    const overlay = document.getElementById("student-setup-overlay");
+    if (overlay && overlay.style.display === "flex") {
+      overlay.style.display = "none";
+      overlay.classList.remove("hide-setup-text");
+      document.getElementById("student-name-input").style.display = "block";
+      document.getElementById("student-name-submit").style.display = "block";
+      document.getElementById("character-selection").style.display = "none";
+    }
+  }
+});
+
+
+                                                                                        // ==========================
+// MINUTES TO CLASSES CONVERSION
+// ==========================
+function convertMinutesToClasses(minutes) {
+  if (typeof minutes !== 'number' || isNaN(minutes)) {
+    return "0 classes";
+  }
+  
+  const classes = Math.round(minutes / 75);
+  
+  if (classes === 1) {
+    return "1 class";
+  } else {
+    return `${classes} classes`;
+  }
+}
+
+// Alternative version with decimal precision if needed:
+function convertMinutesToClassesDecimal(minutes, decimalPlaces = 1) {
+  if (typeof minutes !== 'number' || isNaN(minutes)) {
+    return "0 classes";
+  }
+  
+  const classes = (minutes / 75).toFixed(decimalPlaces);
+  return `${classes} classes`;
+}
+//==============================REWARD SYSTEM =============================================
+// ==========================
+// UPDATED PROFILE REWARDS SYSTEM
+// ==========================
+
+// ==========================
+// WELCOME TOUR SYSTEM - INTEGRATED INTO MAP
+// ==========================
+let currentTourStep = 0;
+let hasCompletedTour = localStorage.getItem("hasCompletedTour") === "true";
+let highlightedElements = [];
+
+// Tour steps configuration with positions
+const tourSteps = [
+  {
+    image: "welcome/edu1.png",
+    text: "Hail, traveler, and welcome to the kingdom of Artheim. I am here to serve as your guide. ",
+    imagePosition: { x: 50, y: 103 }, // Center of screen
+    talkBubblePosition: { x: 30, y: 50 }, // Bottom center
+    talkBubbleClass: "talk-bubble-bottom-center",
+    highlightSelector: "#map-container"
+  },
+  {
+    image: "welcome/edu2.png",
+    text: "My name is Eduardo! My purpose is to guide your steps on the journey to come.",
+    imagePosition: { x: 50, y: 110 }, // right side
+    talkBubblePosition: { x: 10, y: 40 }, // Bottom center
+    talkBubbleClass: "talk-bubble-bottom-center",
+    highlightSelector: "#map-container"
+  },
+    {
+    image: "welcome/edu3.png",
+    text: "You've arrived in Artheim, where every splash of color is a doorway and every sketch tells a tale! Your gallery of quests is open—which masterpiece will you complete first?",
+    imagePosition: { x: 95, y: 120 }, // right side
+    talkBubblePosition: { x: 60, y: 20 }, // Bottom center
+    talkBubbleClass: "talk-bubble-bottom-center",
+    highlightSelector: "#map-container"
+  },
+  {
+    image: "welcome/edu4.png",
+    text: "Click on a city on the map or any of the monsters to see detailed information",
+    imagePosition: { x: 50, y: 420 }, // Top right
+    talkBubblePosition: { x: 65, y: 20 }, // Top left
+    talkBubbleClass: "talk-bubble-bottom-center",
+  },
+  { 
+    image: "welcome/edu16.png",
+    glowEffect: "blue",
+    imagePosition: { x: 2, y: 330 },
+    text: "The blue quests are our 'Studies in Practice.' Think of them as quick, rewarding formatives—a perfect way to learn the rules of our world before you master the skills.",
+    imagePosition: { x: 2, y: 330 }, // Top right
+    talkBubblePosition: { x: 0, y: 5 }, // Top left
+    talkBubbleClass: "talk-bubble-bottom-center",
+    openQuest: "quest1"
+  },
+  { 
+    image: "welcome/edu15.png",
+    text: "Then, there are the Golden Quests. These are your summative objectives, the MVPs of this realm. The difficulty is high, but the rewards define a legacy.",
+    imagePosition: { x: 2, y: 400 }, // Top right
+    talkBubblePosition: { x: 0, y: 25 }, // Top left
+    talkBubbleClass: "talk-bubble-bottom-center",
+    openQuest: "quest4"
+  },
+
+    {
+    image: "welcome/edu5.png",
+    text: "<b>`The Path`</b> is the discipline you will master (Painting, Watercolor, Sketch, 3D).<br><b>`The Title`</b> is the name of the specific challenge that awaits you.",
+    imagePosition: { x: 110, y: 20 }, // Top left
+    talkBubblePosition: { x: 80, y: 60 }, // Top right
+    talkBubbleClass: "talk-bubble-left",
+    openQuest: "quest1",
+    highlightSelector: ["#quest-paths", "#quest-title"]
+  },
+  {
+    image: "welcome/edu5.png",
+    text: "The <b>'Rationale'</b> explains why this quest is important for your artistic journey.<br>While the <b>Dificulty</b> shows how hard the quest is.",
+    imagePosition: { x: 110, y: 20 }, // Top left
+    talkBubblePosition: { x: 80, y: 60 }, // Top right
+    talkBubbleClass: "talk-bubble-left",
+    openQuest: "quest1",
+    highlightSelector:"#quest-rationale"
+  },
+  {
+    image: "welcome/edu6.png",
+    text: "The <b>'Timer'</b> shows how long you have to finish a quest.<br> When it's close to run out, you will receive a warning!",
+    imagePosition: { x: 0, y: 100 }, // Top left
+    talkBubblePosition: { x: 30, y: 30 }, // Top right
+    talkBubbleClass: "talk-bubble-left",
+    openQuest: "quest1",
+    highlightSelector:"#quest-accept"
+  },
+  {
+    image: "welcome/edu8.png",
+    text: "In the middle you can see all details of you quest.<br><b> Pay Attention!</b>",
+    imagePosition: { x: 100, y: 200 }, // Top left
+    talkBubblePosition: { x: 65, y: 49 }, // Top right
+    talkBubbleClass: "talk-bubble-left",
+    openQuest: "quest1",
+    highlightSelector:["#quest-character","#quest-text","#quest-requirements"]
+  },
+  {
+    image: "welcome/edu7.png",
+    text: "The <b>'Rubric'</b> shows how your work will be assessed. <br>Complete quests to unlock your grading!",
+    imagePosition: { x: 45, y: 170 }, // Bottom right
+    talkBubblePosition: { x: 75, y: 35 }, // Bottom left
+    talkBubbleClass: "talk-bubble-top-right",
+    openQuest: "quest1",
+    highlightSelector: "#quest-rubric"
+  },
+    {
+    image: "welcome/edu9.png",
+    text: "The <b>'Sample'</b> is a MUST see. It will help me to guide you.</br> The <b>'Pre requisites/Leads to'</b> show quests related to the one you are doing.",
+    imagePosition: { x: 100, y: 170 }, // Bottom right
+    talkBubblePosition: { x: 70, y: 25 }, // Bottom left
+    talkBubbleClass: "talk-bubble-top-right",
+    openQuest: "quest1",
+    highlightSelector: ["#quest-links","#quest-prereq-leads-prereq"]  
+  },
+  {
+    image: "welcome/edu10.png",
+    text: "and finally we have the <b>'Reward'</b>. Better grades mean better rewards!!",
+    imagePosition: { x: 100, y: 180 }, // Bottom right
+    talkBubblePosition: { x: 67, y: 35 }, // Bottom left
+    talkBubbleClass: "talk-bubble-top-right",
+    openQuest: "quest1",
+    highlightSelector: "#quest-reward"
+  },
+  {
+    image: "welcome/edu14.png",
+    text: "The <b>'Search'</b> helps you to descover your new adventure. You can search by, title, skill, or any keyword.<br><br> You can also see other maps there.",
+    imagePosition: { x: 65, y: 60 }, // Middle right
+    talkBubblePosition: { x: 35, y: 40 }, // Middle left
+    talkBubbleClass: "talk-bubble-right",
+    highlightSelector: "#dropdown-container"
+  },
+
+  {
+    image: "welcome/edu11.png",
+    text: "You can track your progress on you <b>'Profile'</b> button.<br>It tracks your grades and total rewards. You can save your progress there too!",
+    imagePosition: { x: 60, y: 80 }, // Bottom left
+    talkBubblePosition: { x: 80, y: 20 }, // Top right
+    talkBubbleClass: "talk-bubble-bottom-left",
+  },
+    {
+    image: "welcome/edu12.png",
+    text: "You can also change your avatar there.",
+    imagePosition: { x: 60, y: 80 }, // Bottom left
+    talkBubblePosition: { x: 80, y: 20 }, // Top right
+    talkBubbleClass: "talk-bubble-bottom-left",
+  },
+    {
+    image: "welcome/edu13.png",
+    text: "The <b>'🏆Achievements'</b> shows all quests you completed.<br><br> You can also complete themed groups of quests to get better rewards! <br>Show off your mastery!",
+    imagePosition: { x: 90, y: 90 }, // Middle left
+    talkBubblePosition: { x: 50, y: 40 }, // Middle right
+    talkBubbleClass: "talk-bubble-left",
+  },
+
+  {
+    image: "welcome/edu17.png",
+    text: "Now <b>YOU</b> decide your path!<br><br> Chose your own quests,<br> work hard and show me that you control your destiny!<br><br> Ready to begin your adventure?",
+    imagePosition: { x: 50, y: 400 }, // Center
+    talkBubblePosition: { x: 50, y: 0 }, // Top center
+    talkBubbleClass: "talk-bubble-bottom-center",
+  }
+];
+
+function showWelcomeTour() {
+  // Skip if already completed
+  if (hasCompletedTour) return;
+  
+  // Show tour after a short delay
+  setTimeout(() => {
+    const container = document.getElementById("welcome-tour-container");
+    if (container) {
+      container.style.display = "block";
+      updateTourStep(0);
+    }
+  }, 1000);
+}
+
+function updateTourStep(stepIndex) {
+  const step = tourSteps[stepIndex];
+  if (!step) return;
+  
+  currentTourStep = stepIndex;
+  
+  // Remove previous highlights
+  clearHighlights();
+  
+// Handle quest opening/closing based on step configuration
+  if (step.openQuest) {
+    // Close any open quest first
+    closeQuest();
+    
+    // Open the specified quest after a short delay
+    setTimeout(() => {
+      if (quests[step.openQuest]) {
+        openQuest(step.openQuest);
+      } else {
+        console.warn(`Quest ${step.openQuest} not found in quests data`);
+      }
+    }, 100);
+  } else {
+    // Close quest overlay if this step doesn't need it
+    closeQuest();
+  }
+  
+  // Update image
+  
+  // Update image
+  const imageElement = document.getElementById("welcome-tour-image");
+  const imageWrapper = document.getElementById("welcome-tour-image-wrapper");
+  
+  if (imageElement && imageWrapper) {
+    // Set image source
+    imageElement.src = step.image;
+    imageElement.alt = `Tour step ${stepIndex + 1}`;
+    
+    // Position image
+    const x = step.imagePosition.x;
+    const y = step.imagePosition.y;
+    
+    imageWrapper.style.left = `${x}%`;
+    imageWrapper.style.top = `${y}%`;
+    imageWrapper.style.transform = `translate(-${x}%, -${y}%)`;
+  }
+  
+  // Update talk bubble
+  const talkBubble = document.getElementById("welcome-tour-talk-bubble");
+  if (talkBubble) {
+    // Remove all positioning classes
+    talkBubble.className = "";
+    talkBubble.id = "welcome-tour-talk-bubble";
+    
+    // Add new positioning class
+    if (step.talkBubbleClass) {
+      talkBubble.classList.add(step.talkBubbleClass);
+    }
+    
+    // Position talk bubble
+    talkBubble.style.left = `${step.talkBubblePosition.x}%`;
+    talkBubble.style.top = `${step.talkBubblePosition.y}%`;
+    talkBubble.style.transform = `translate(-${step.talkBubblePosition.x}%, -${step.talkBubblePosition.y}%)`;
+    
+    // Update text and counter
+    document.getElementById("welcome-tour-text").innerHTML  = step.text;
+    document.getElementById("welcome-tour-counter").textContent = 
+      `${stepIndex + 1}/${tourSteps.length}`;
+    
+    // Update button visibility
+    document.getElementById("welcome-tour-prev").style.display = 
+      stepIndex === 0 ? "none" : "inline-block";
+    
+    document.getElementById("welcome-tour-next").style.display = 
+      stepIndex === tourSteps.length - 1 ? "none" : "inline-block";
+    
+    document.getElementById("welcome-tour-finish").style.display = 
+      stepIndex === tourSteps.length - 1 ? "inline-block" : "none";
+  }
+  
+  // Highlight relevant element if selector exists
+  if (step.highlightSelector) {
+    highlightElement(step.highlightSelector);
+  }
+}
+
+function highlightElement(selector) {
+  // Try to find all matching elements
+  const elements = document.querySelectorAll(selector);
+  
+  elements.forEach(element => {
+    if (element) {
+      // Save original style
+      const originalBoxShadow = element.style.boxShadow;
+      const originalZIndex = element.style.zIndex;
+      const originalPosition = element.style.position;
+      
+      // Apply highlight
+      element.classList.add("tour-highlight");
+      element.style.zIndex = "9997";
+      
+      // Make sure element is visible for highlighting
+      if (getComputedStyle(element).display === "none") {
+        element.style.display = "block";
+      }
+      
+      // Store for cleanup
+      highlightedElements.push({
+        element,
+        originalBoxShadow,
+        originalZIndex,
+        originalPosition
+      });
+    }
+  });
+}
+
+function clearHighlights() {
+  highlightedElements.forEach(item => {
+    if (item.element) {
+      item.element.classList.remove("tour-highlight");
+      item.element.style.boxShadow = item.originalBoxShadow;
+      item.element.style.zIndex = item.originalZIndex;
+      item.element.style.position = item.originalPosition;
+    }
+  });
+  highlightedElements = [];
+    // SPECIAL: Remove highlight from timer button specifically
+  const timerButton = document.getElementById("quest-accept");
+  if (timerButton) {
+    timerButton.classList.remove("tour-highlight");
+    timerButton.style.boxShadow = "";
+    timerButton.style.outline = "";
+  }
+}
+
+function nextTourStep() {
+  if (currentTourStep < tourSteps.length - 1) {
+    updateTourStep(currentTourStep + 1);
+  }
+}
+
+function prevTourStep() {
+  if (currentTourStep > 0) {
+    updateTourStep(currentTourStep - 1);
+  }
+}
+
+function skipTour() {
+  if (confirm("Skip the welcome tour? You can always access it from your profile later.")) {
+    finishTour();
+  }
+}
+
+function finishTour() {
+  hasCompletedTour = true;
+  localStorage.setItem("hasCompletedTour", "true");
+  
+  // Clear highlights
+  clearHighlights();
+  
+  // Hide tour container
+  const container = document.getElementById("welcome-tour-container");
+  if (container) {
+    container.style.display = "none";
+  }
+}
+
+function restartTour() {
+  hasCompletedTour = false;
+  localStorage.removeItem("hasCompletedTour");
+  showWelcomeTour();
+}
+
+// Initialize tour
+function initializeWelcomeTour() {
+  // Add event listeners
+  const nextButton = document.getElementById("welcome-tour-next");
+  const prevButton = document.getElementById("welcome-tour-prev");
+  const skipButton = document.getElementById("welcome-tour-skip");
+  const finishButton = document.getElementById("welcome-tour-finish");
+  
+  if (nextButton) nextButton.addEventListener("click", nextTourStep);
+  if (prevButton) prevButton.addEventListener("click", prevTourStep);
+  if (skipButton) skipButton.addEventListener("click", skipTour);
+  if (finishButton) finishButton.addEventListener("click", finishTour);
+  
+  // Close tour with Escape key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      const container = document.getElementById("welcome-tour-container");
+      if (container && container.style.display === "block") {
+        skipTour();
+      }
+    }
+  });
+  
+  // Make tour interactive (allow clicking on elements being highlighted)
+  document.addEventListener("click", (e) => {
+    if (hasCompletedTour) return;
+    
+    const container = document.getElementById("welcome-tour-container");
+    if (!container || container.style.display !== "block") return;
+    
+    // If user clicks on a highlighted element, advance tour
+    const highlightedElement = e.target.closest(".tour-highlight");
+    if (highlightedElement) {
+      nextTourStep();
+    }
+    
+    // If user clicks on the map, maybe advance to next step if appropriate
+    if (e.target.closest("#map-container") && currentTourStep === 0) {
+      nextTourStep();
+    }
+  });
+}
+
+// Add restart tour button to profile
+function addRestartTourToProfile() {
+  const restartBtn = document.getElementById("restart-tour-btn");
+  
+  if (restartBtn) {
+    restartBtn.addEventListener("click", () => {
+      // Close profile overlay
+      document.getElementById("profile-overlay").style.display = "none";
+      
+      // Restart the tour
+      restartTour();
+    });
+  } else {
+    console.warn("Restart tour button not found in the DOM");
+  }
+}
+
+// Update your existing functions to integrate with tour
+function selectCharacter(character) {
+  const profile = {
+    name: document.getElementById("student-name-input").value.trim(),
+    character: character.image
+  };
+
+  saveStudentProfile(profile);
+  updateProfileUI();
+
+  const setupOverlay = document.getElementById("student-setup-overlay");
+  if (setupOverlay) {
+    setupOverlay.style.display = "none";
+  }
+  
+  // Start welcome tour after profile is created
+  setTimeout(showWelcomeTour, 500);
+}
+
+// Add CSS for talk bubble pointer positions
+function addTourStyles() {
+  const style = document.createElement('style');
+  style.textContent = `
+    .talk-bubble-top-left:after {
+      top: -30px;
+      left: 20px;
+      border-color: transparent transparent rgba(24, 31, 141, 0.726) transparent;
+    }
+    
+    .talk-bubble-top-right:after {
+      top: -30px;
+      right: 20px;
+      border-color: transparent transparent rgba(24, 31, 141, 0.726)transparent;
+    }
+    
+    .talk-bubble-bottom-left:after {
+      bottom: -30px;
+      left: 20px;
+      border-color: rgba(24, 31, 141, 0.726) transparent transparent transparent;
+    }
+    
+    .talk-bubble-bottom-right:after {
+      bottom: -30px;
+      right: 50px;
+      border-color: rgba(24, 31, 141, 0.726) transparent transparent transparent;
+    }
+    
+    .talk-bubble-left:after {
+      left: -30px;
+      top: 50%;
+      transform: translateY(-50%);
+      border-color: transparent rgba(24, 31, 141, 0.726) transparent transparent;
+    }
+    
+    .talk-bubble-right:after {
+      right: -30px;
+      top: 50%;
+      transform: translateY(-0%);
+      border-color: transparent transparent transparent rgba(24, 31, 141, 0.726);
+    }
+    
+    .talk-bubble-bottom-center:after {
+      bottom: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-color: rgba(24, 31, 141, 0.726) transparent transparent transparent;
+    }
+    
+    .talk-bubble-top-center:after {
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-color: transparent transparent rgba(24, 31, 141, 0.726) transparent;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+// Update DOMContentLoaded to initialize tour
+document.addEventListener("DOMContentLoaded", () => {
+  updateProfileUI();
+  recalculateAllQuestRewards();
+  
+  // Add tour styles
+  addTourStyles();
+  
+  // Initialize tour system
+  initializeWelcomeTour();
+  
+  // Check if we should show tour for returning users
+  const profile = loadStudentProfile();
+  if (profile && profile.name && !hasCompletedTour) {
+    setTimeout(showWelcomeTour, 1000);
+  }
+  
+  // Add restart button to profile
+  addRestartTourToProfile();
+  
+  // ... rest of your existing code ...
+});
+
+// Also update initializeStudentSetup
+function initializeStudentSetup() {
+  const profile = loadStudentProfile();
+
+  // If profile exists, skip setup and welcome
+  if (profile && profile.name) {
+    updateProfileUI();
+    return;
+  }
+
+  // show welcome overlay first
+  showWelcomeOverlay();
+}
+function openElementInsideQuest(elementType, questId) {
+  // ... your existing rationale/rubric code ...
+  
+  switch(elementType.toLowerCase()) {
+    // ... your existing cases for rubric, rationale, timer ...
+    
+    case "profile":
+      // Open profile overlay
+      const profileBtn = document.getElementById("profile-btn");
+      if (profileBtn) {
+        // Store current onclick
+        if (profileBtn.onclick && !profileBtn.dataset.originalOnclick) {
+          profileBtn.dataset.originalOnclick = profileBtn.onclick.toString();
+        }
+        
+        // Simulate click
+        const profileOverlay = document.getElementById("profile-overlay");
+        if (profileOverlay) {
+          profileOverlay.style.display = "flex";
+          
+          // Update profile data for demo
+          updateProfileStandardsTable();
+          renderRadarChart();
+          updateProfileRewards();
+        }
+      }
+      break;
+      
+    case "achievements":
+      // Open achievements overlay
+      const achievementsBtn = document.getElementById("achievements-btn");
+      if (achievementsBtn) {
+        // Store current onclick
+        if (achievementsBtn.onclick && !achievementsBtn.dataset.originalOnclick) {
+          achievementsBtn.dataset.originalOnclick = achievementsBtn.onclick.toString();
+        }
+        
+        // Simulate click
+        const achievementsOverlay = document.getElementById("achievements-overlay");
+        if (achievementsOverlay) {
+          achievementsOverlay.style.display = "flex";
+          
+          // Render achievements for demo
+          renderCompletedQuests();
+          renderAchievementsList();
+        }
+      }
+      break;
+      
+    default:
+      console.log(`Element type ${elementType} not recognized`);
+  }
+}
+function showCharacterSetup() {
+  const setupOverlay = document.getElementById("student-setup-overlay");
+  if (!setupOverlay) return;
+  
+  // Load available characters
+  loadAvailableCharacters();
+  
+  setupOverlay.style.display = "flex";
+  
+  // Add event listener for name submission
+  const nameSubmitBtn = document.getElementById("student-name-submit");
+  const nameInput = document.getElementById("student-name-input");
+  
+  if (nameSubmitBtn && nameInput) {
+    nameSubmitBtn.addEventListener("click", () => {
+      const name = nameInput.value.trim();
+      if (!name) {
+        alert("Please enter your name to continue.");
+        return;
+      }
+      
+      // Show character selection
+      document.getElementById("character-selection").style.display = "block";
+      nameSubmitBtn.style.display = "none";
+      nameInput.style.display = "none";
+      document.querySelector("#student-setup-overlay .scroll-body p").style.display = "none";
+    });
+  }
+}
+
+function loadAvailableCharacters() {
+  const charactersList = document.getElementById("characters-list");
+  if (!charactersList) return;
+  
+  // Clear existing characters
+  charactersList.innerHTML = "";
+  
+  // Load characters from JSON file
+  fetch('characters/characters.json')
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Failed to load characters.json');
+      }
+      return response.json();
+    })
+    .then(charFiles => {
+      // Create character selection buttons
+      charFiles.forEach((charFile, index) => {
+        const charDiv = document.createElement("div");
+        charDiv.className = "character-option";
+        charDiv.innerHTML = `
+          <img src="characters/${charFile}" alt="Character ${index + 1}" />
+        `;
+        
+        charDiv.addEventListener("click", () => selectCharacter({
+          id: `character${index + 1}`,
+          image: `characters/${charFile}`
+        }));
+        
+        charactersList.appendChild(charDiv);
+      });
+    })
+    .catch(error => {
+      console.error('Error loading characters:', error);
+      
+      // Fallback if JSON fails
+      const fallbackChars = ['char1.gif', 'char2.gif', 'char3.gif', 'char5.gif'];
+      
+      fallbackChars.forEach((charFile, index) => {
+        const charDiv = document.createElement("div");
+        charDiv.className = "character-option";
+        charDiv.innerHTML = `
+          <img src="characters/${charFile}" alt="Character ${index + 1}" />
+        `;
+        
+        charDiv.addEventListener("click", () => selectCharacter({
+          id: `character${index + 1}`,
+          image: `characters/${charFile}`
+        }));
+        
+        charactersList.appendChild(charDiv);
+      });
+    });
+}
+// ==========================
+// QUEST LIST FUNCTIONS
+// ==========================
+
+function renderQuestList(filter = 'all') {
+  const container = document.getElementById('questlist-container');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  if (!quests || Object.keys(quests).length === 0) {
+    container.innerHTML = '<div class="questlist-empty">Loading quests...</div>';
+    return;
+  }
+  
+  let filteredQuests = [];
+  
+  // Apply filter
+  switch(filter) {
+    case 'active':
+      filteredQuests = Object.entries(quests).filter(([id, quest]) => 
+        questAccepted[id] && quest.timer
+      );
+      break;
+      
+    case 'paintersPath':
+    case 'sketcherPath':
+    case 'watercoloursPath':
+    case '3DPath':
+      // Map filter value to actual path names in JSON
+      const pathMap = {
+        'paintersPath': 'Painter Path',
+        'sketcherPath': 'Sketcher Path', 
+        'watercoloursPath': 'Watercolor Path',
+        '3DPath': '3D Path'
+      };
+      
+      const targetPath = pathMap[filter];
+      
+      filteredQuests = Object.entries(quests).filter(([id, quest]) => {
+        if (!quest.path) return false;
+        
+        // Check if quest.path array contains the target path
+        if (Array.isArray(quest.path)) {
+          return quest.path.includes(targetPath);
+        }
+        return false;
+      });
+      break;
+      
+    default: // 'all'
+      filteredQuests = Object.entries(quests);
+  }
+  
+  // Sort by ID for consistent ordering
+  filteredQuests.sort(([idA], [idB]) => {
+    const numA = parseInt(idA.replace('quest', '')) || 0;
+    const numB = parseInt(idB.replace('quest', '')) || 0;
+    return numA - numB;
+  });
+  
+  // Update count
+  document.getElementById('questlist-count').textContent = 
+    `${filteredQuests.length} ${filter === 'all' ? 'total' : 'filtered'} quest${filteredQuests.length !== 1 ? 's' : ''}`;
+  
+  if (filteredQuests.length === 0) {
+    container.innerHTML = '<div class="questlist-empty">No quests match your filter</div>';
+    return;
+  }
+  
+  // Render each quest (keep the rest of your existing rendering code)
+  filteredQuests.forEach(([id, quest]) => {
+    const isActive = questAccepted[id] && quest.timer;
+    const isCompleted = completedQuests[id];
+    
+    const questElement = document.createElement('div');
+    questElement.className = `questlist-item ${isActive ? 'active' : ''}`;
+    questElement.dataset.questId = id;
+    
+    // Format timer display
+    let timerDisplay = '';
+    if (quest.timer) {
+      const allottedMinutes = quest.timer.allottedMinutes || 0;
+      const classes = Math.round(allottedMinutes / 75);
+      timerDisplay = `${classes} class${classes !== 1 ? 'es' : ''}`;
+    }
+    
+    // Get path display
+    let pathDisplay = 'No path assigned';
+    if (quest.path && Array.isArray(quest.path)) {
+      pathDisplay = quest.path.join(', ');
+    }
+    
+    questElement.innerHTML = `
+      <div class="questlist-header">
+        <h3 class="questlist-title">${quest.title || 'Untitled Quest'}</h3>
+        <span class="questlist-id">${id}</span>
+      </div>
+      <div class="questlist-details">
+        <div>
+          <span class="questlist-path">${pathDisplay}</span>
+          ${quest.timer ? `<span class="questlist-timer ${isActive ? 'active' : ''}">⏱ ${timerDisplay}</span>` : ''}
+        </div>
+        <div>
+          ${isCompleted ? '<span class="questlist-completed">✓ Completed</span>' : ''}
+          ${isActive ? '<span class="questlist-timer active">🔴 Active</span>' : ''}
+        </div>
+      </div>
+    `;
+    
+    // Add click event
+    questElement.addEventListener('click', () => {
+      document.getElementById('achievements-overlay').style.display = 'none';
+      openQuest(id);
+    });
+    
+    container.appendChild(questElement);
+  });
+}
+// Initialize quest list functionality
+function initializeQuestList() {
+  const filterSelect = document.getElementById('questlist-filter');
+  if (filterSelect) {
+    filterSelect.addEventListener('change', (e) => {
+      renderQuestList(e.target.value);
+    });
+  }
+  
+  // No additional event listener needed - tab switching is handled elsewhere
+}
+
+// Tab switching logic (this is already in your code, just ensure it has the questlist logic)
+document.querySelectorAll(".achievements-tabs .tab-button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    // Remove active class from all tabs
+    document.querySelectorAll(".tab-button").forEach(b => b.classList.remove("active"));
+    
+    // Add active class to clicked tab
+    btn.classList.add("active");
+
+    // Hide all tab content
+    document.querySelectorAll(".tab-content").forEach(tab => tab.style.display = "none");
+    
+    // Show the selected tab content
+    const tabId = "tab-" + btn.dataset.tab;
+    document.getElementById(tabId).style.display = "block";
+    
+    // Handle specific tab functionality
+    if (btn.dataset.tab === "questlist") {
+      renderQuestList(document.getElementById("questlist-filter").value);
+    } else if (btn.dataset.tab === "pathfinder") {
+      // First, make sure the container is visible
+      const questionsContainer = document.getElementById('pathfinder-questions-container');
+      const resultsContainer = document.getElementById('pathfinder-results-container');
+      const submitContainer = document.getElementById('pathfinder-submit-container');
+      
+      // Initialize pathfinder if needed
+      if (!pathfinderQuestions) {
+        // Show loading state
+        if (questionsContainer) {
+          questionsContainer.innerHTML = '<div style="color: white; text-align: center; padding: 20px;">Loading questionnaire...</div>';
+          questionsContainer.style.display = 'block';
+        }
+        if (resultsContainer) resultsContainer.style.display = 'none';
+        if (submitContainer) submitContainer.style.display = 'block';
+        
+        // Then initialize
+        initializePathfinder();
+      } else {
+        resetPathfinder();
+      }
+    }
+  });
+});
+
+
+// ==========================
+// RESPONSIVE HELPER FUNCTIONS
+// ==========================
+
+// Handle orientation changes
+function handleOrientationChange() {
+  const isPortrait = window.innerHeight > window.innerWidth;
+  
+  if (isPortrait && window.innerWidth < 768) {
+    // Portrait mode on mobile - adjust hotspots if needed
+    document.querySelectorAll('.hotspot').forEach(hotspot => {
+      hotspot.style.transform = 'translate(-50%, -50%) scale(1.2)';
+    });
+  } else {
+    // Landscape or desktop - reset
+    document.querySelectorAll('.hotspot').forEach(hotspot => {
+      hotspot.style.transform = 'translate(-50%, -50%)';
+    });
+  }
+  
+  // Recalculate radar chart if profile is open
+  if (document.getElementById('profile-overlay').style.display === 'flex') {
+    renderRadarChart();
+  }
+}
+
+// Touch event handling improvements
+function initializeTouchEvents() {
+  // Prevent double-tap zoom on interactive elements
+  document.addEventListener('touchstart', function(e) {
+    if (e.target.tagName === 'BUTTON' || 
+        e.target.tagName === 'SELECT' ||
+        e.target.classList.contains('hotspot') ||
+        e.target.classList.contains('tab-button')) {
+      if (e.touches.length > 1) {
+        e.preventDefault();
+      }
+    }
+  }, { passive: false });
+  
+  // Add touch feedback
+  document.addEventListener('touchstart', function(e) {
+    const target = e.target;
+    if (target.tagName === 'BUTTON' || 
+        target.classList.contains('tab-button') ||
+        target.classList.contains('profile-btn-small') ||
+        target.classList.contains('hotspot')) {
+      target.classList.add('touch-active');
+    }
+  });
+  
+  document.addEventListener('touchend', function(e) {
+    const target = e.target;
+    if (target.classList.contains('touch-active')) {
+      setTimeout(() => {
+        target.classList.remove('touch-active');
+      }, 150);
+    }
+  });
+}
+
+// Adjust hotspot positions for different screen sizes
+function adjustHotspotPositions() {
+  // This function is now handled by updateHotspotPositions()
+  updateHotspotPositions();
+}
+
+// Initialize responsive behaviors
+function initializeResponsiveBehaviors() {
+  // Handle initial load
+  handleOrientationChange();
+  adjustHotspotPositions();
+  initializeTouchEvents();
+  
+  // Add event listeners
+  window.addEventListener('resize', () => {
+    handleOrientationChange();
+    adjustHotspotPositions();
+  });
+  
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => {
+      handleOrientationChange();
+      adjustHotspotPositions();
+    }, 300);
+  });
+}
+
+// Add to your existing DOMContentLoaded event
+document.addEventListener("DOMContentLoaded", () => {
+  // ... your existing code ...
+  
+  // Add responsive initialization
+  initializeResponsiveBehaviors();
+  
+   // ==========================
+  // WORK IMAGE UPLOAD
+  // ==========================
+  const imageInput = document.getElementById("work-image-input");
+  if (imageInput) {
+    imageInput.addEventListener("change", function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (event) {
+        document.getElementById("work-preview").src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+});
+
+// HELP BUTTON ========================================================================//
+let helpModal = null;
+let helpBtn = null;
+let closeBtn = null;
+
+// Make closeHelpModal globally available
+window.closeHelpModal = function() {
+  console.log("Closing help modal");
+  if (helpModal) {
+    helpModal.style.display = 'none';
+  }
+};
+
+function initializeHelpModal() {
+  helpModal = document.getElementById('helpModal');
+  helpBtn = document.getElementById('helpButton');
+  closeBtn = document.getElementById('closeModalBtn');
+  
+  console.log("Help modal elements:", { helpModal, helpBtn, closeBtn });
+  
+  if (!helpModal || !helpBtn || !closeBtn) {
+    console.warn("Help modal elements not found - check IDs in HTML");
+    return;
+  }
+
+  // Function to open modal
+  function openHelpModal(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("Opening help modal");
+    helpModal.style.display = 'block';
+  }
+
+  // Event listeners
+  helpBtn.addEventListener('click', openHelpModal);
+  closeBtn.addEventListener('click', window.closeHelpModal);
+
+  // Close when clicking outside the modal content
+  window.addEventListener('click', function(event) {
+    if (event.target === helpModal) {
+      window.closeHelpModal();
+    }
+  });
+}
+
+// Make sure this runs after DOM is loaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeHelpModal);
+} else {
+  // DOM is already loaded
+  initializeHelpModal();
+}
+
+
+// ==========================
+// GALLERY FUNCTIONS
+// ==========================
+
+// Open gallery overlay
+function openGallery() {
+  const overlay = document.getElementById("gallery-overlay");
+  if (!overlay) return;
+  
+  // Get student name from profile
+  const profile = loadStudentProfile() || {};
+  const studentName = profile.name || "Student";
+  
+  // Update header
+  const header = document.getElementById("gallery-student-name");
+  if (header) {
+    header.textContent = `${studentName}'s Art Gallery`;
+  }
+  
+  // Render gallery items
+  renderGalleryItems();
+  
+  // Show overlay
+  overlay.style.display = "flex";
+}
+
+// Close gallery overlay
+function closeGallery() {
+  const overlay = document.getElementById("gallery-overlay");
+  if (overlay) {
+    overlay.style.display = "none";
+  }
+}
+
+// Render all artworks in the gallery
+function renderGalleryItems() {
+  const galleryGrid = document.getElementById("gallery-grid");
+  if (!galleryGrid) return;
+  
+  // Clear current content
+  galleryGrid.innerHTML = "";
+  
+  // Get all works from studentWorks
+  const works = studentWorks || {};
+  const worksArray = Object.entries(works);
+  
+  if (worksArray.length === 0) {
+    galleryGrid.innerHTML = '<div class="gallery-empty">No artworks uploaded yet</div>';
+    return;
+  }
+  
+  // Create gallery items
+  worksArray.forEach(([questId, work]) => {
+    // Skip if work has no title and no image (empty work)
+    if (!work.title && !work.image && !work.description) return;
+    
+    const galleryItem = document.createElement("div");
+    galleryItem.className = "gallery-item";
+     const quest = quests[questId];
+    if (quest && quest.style === "mvp") {
+      galleryItem.classList.add("mvp");
+    }
+    galleryItem.dataset.questId = questId;
+    
+    // Create thumbnail (use image if available, otherwise placeholder)
+    const thumbnail = document.createElement("img");
+    thumbnail.className = "gallery-thumbnail";
+    
+    if (work.image) {
+      thumbnail.src = work.image;
+    } else {
+      // Use a placeholder or the quest character image
+      const quest = quests[questId];
+      thumbnail.src = quest?.character || "placeholder.png";
+      thumbnail.style.opacity = "0.7";
+    }
+    
+    thumbnail.alt = work.title || "Artwork";
+    
+    // Create title
+    const title = document.createElement("div");
+    title.className = "gallery-title";
+    title.textContent = work.title || "Untitled";
+    
+    // Assemble item
+    galleryItem.appendChild(thumbnail);
+    galleryItem.appendChild(title);
+    
+    // Add click event to open work overlay
+  galleryItem.addEventListener("click", () => {
+      closeGallery(); // Close gallery first
+      
+      // Small delay to allow gallery to close
+      setTimeout(() => {
+        // First open the quest popup
+        if (quests[questId]) {
+          openQuest(questId);
+          // Then automatically open the work overlay for this quest
+          setTimeout(() => {
+            openWorkOverlay(questId);
+          }, 100); // Wait 500ms for quest popup to fully render
+        }
+      }, 100);
+    });
+    
+    galleryGrid.appendChild(galleryItem);
+  });
+  
+  // If no items were added (all were empty), show empty message
+  if (galleryGrid.children.length === 0) {
+    galleryGrid.innerHTML = '<div class="gallery-empty">No artworks uploaded yet</div>';
+  }
+}
+
+// Initialize gallery event listeners
+function initializeGallery() {
+  // Close button
+  const closeBtn = document.getElementById("close-gallery");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", closeGallery);
+  }
+  
+  // Close on overlay click
+  const overlay = document.getElementById("gallery-overlay");
+  if (overlay) {
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) {
+        closeGallery();
+      }
+    });
+  }
+  
+  // Close on Escape key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      const galleryOverlay = document.getElementById("gallery-overlay");
+      if (galleryOverlay && galleryOverlay.style.display === "flex") {
+        closeGallery();
+      }
+    }
+  });
 }

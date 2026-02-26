@@ -159,7 +159,7 @@
     "links": [{"type": "10 Modern Art Movements", "url": "https://www.britannica.com/list/10-modernist-art-movements" },
               {"type":"174 Art Movements","url":"https://www.theartstory.org/movements/"}],
     "reward": "",
-    "character": "charimage/char3.gif",
+    "character": "charimage/char3.png",
     "prerequisites":["quest1"],
     "style": "",
     "completed": false,
@@ -328,7 +328,7 @@
       "links": [{"type": "Video sample", "url": "https://www.youtube.com/watch?v=tIyqMTKFmC0" },
       {"type":"Video sample","url":"https://www.youtube.com/watch?v=ZONVHAftzFg"}],
     "reward": " you got money!!!!",
-    "character": "charimage/char6.gif",
+    "character": "charimage/char6.png",
     "style": "",
     "prerequisites": ["quest1"],
     "completed": false,
@@ -340,9 +340,9 @@
   "quest7": {
     "path": ["Painter Path"],
     "difficulty": 1,
-    "title": "The Willow Grain’s Challenge",
-    "rationale": "<h2>The Willow Grain’s Challenge</h2><p><strong>Why it’s important:</strong><br>Texture makes surfaces believable. Wood requires controlled irregularity, which trains your eye to observe subtle patterns and replicate them accurately.</p><p><strong>Skills developed:</strong></p><ul><li>Textural linework and pattern</li><li>Controlled shading for depth</li><li>Surface variation and realism</li><li>Attention to detail</li></ul><p>It strengthens your ability to depict natural materials and environments.</p>",
-    "description": "Willow is struggling with her patterns and needs help. To succeed, you must observe the subtle lines, knots, and grains that make each piece of wood unique, and translate them onto your page with precision and care. This trial will sharpen your skills in texture, line work, and shading as you bring wood to life with your pencil or pen.",
+    "title": "The Woody Grain’s Challenge",
+    "rationale": "<h2>The Woody Grain’s Challenge</h2><p><strong>Why it’s important:</strong><br>Texture makes surfaces believable. Wood requires controlled irregularity, which trains your eye to observe subtle patterns and replicate them accurately.</p><p><strong>Skills developed:</strong></p><ul><li>Textural linework and pattern</li><li>Controlled shading for depth</li><li>Surface variation and realism</li><li>Attention to detail</li></ul><p>It strengthens your ability to depict natural materials and environments.</p>",
+    "description": "Wood is struggling with his patterns and needs help. To succeed, you must observe the subtle lines, knots, and grains that make each piece of wood unique, and translate them onto your page with precision and care. This trial will sharpen your skills in texture, line work, and shading as you bring wood to life with your pencil or pen.",
     "requirements": [
       "Study a piece of wood or reference image carefully",
       "Draw realistic wood textures, including grain, knots, and natural patterns",
@@ -350,7 +350,7 @@
       "Produce a finished drawing that clearly represents wood"
     ],
     "rubric": {
-      "overall": "The Willow Grain’s Challenge",
+      "overall": "The Woody Grain’s Challenge",
       "standards": [
         {
           "code": "Art.FA.CR.1.2.IA",
@@ -377,7 +377,7 @@
     "links": [{"type": "Video sample","url": "https://www.youtube.com/watch?v=m8ZcnTuM-eg&t=311s"},
               {"type": "Video sample","url": "https://www.youtube.com/watch?v=0ex5dnJA07k&t=762s"}],
     "reward": " you got money!!!!",
-    "character": "charimage/char7.gif",
+    "character": "charimage/char7.png",
     "style": "",
     "prerequisites": ["quest1"],
     "completed": false,
@@ -427,7 +427,7 @@
       {"type": "Video sample","url": "https://www.youtube.com/watch?v=igEfTMV3Bbc"},
       {"type": "Video sample","url": "https://www.youtube.com/watch?v=EVvyxjb4hn4"}],
     "reward": " you got money!!!!",
-    "character": "charimage/char8.gif",
+    "character": "charimage/char8.png",
     "style": "",
     "prerequisites": ["quest1"],
     "completed": false,
@@ -932,7 +932,7 @@
     "requirements": [
       "Paint/draw at least 4 cubes",
       "Each cube must show a different texture",
-      "Use acrylic paint/pencil/charcoal",
+      "Use acrylic paint only",
       "Textures must be visually distinct"
     ],
     "rubric": {
@@ -1749,7 +1749,7 @@
       "reward": "you got money!!!!",
       "character": "charimage/char17.png",
       "style": "mvp",
-      "prerequisites": ["quest24", "quest32","quest23","quest49","quest65"],
+      "prerequisites": ["quest24", "quest32","quest23","quest65"],
       "completed": false,
       "timer": {
     "allottedMinutes": 375},
@@ -2031,7 +2031,7 @@
       "reward": "you got money!!!!",
       "character": "charimage/char25.gif",
       "style": "mvp",
-      "prerequisites": ["quest32","quest65","quest49","quest42","quest43"],
+      "prerequisites": ["quest32","quest65","quest42","quest43"],
       "completed": false,
       "timer": {
     "allottedMinutes": 375},
@@ -2736,7 +2736,7 @@
       "reward": "you got money!!!!",
       "character": "charimage/char30a.gif",
       "style": "mvp",
-      "prerequisites": ["quest30","quest44","quest42","quest43","quest45"],
+      "prerequisites": [],
       "completed": false,
       "timer": {
     "allottedMinutes": 375},
@@ -2853,7 +2853,7 @@
       "reward": "you got money!!!!",
       "character": "charimage/char35.gif",
       "style": "mvp",
-      "prerequisites": ["quest5","quest34"],
+      "prerequisites": ["quest34"],
       "completed": false,
       "timer": {
     "allottedMinutes": 300},
@@ -3196,7 +3196,7 @@
   "accepted": false,
   "acceptedAt": null
     },
-     "quest72": {
+      "quest72": {
     "path": ["Sketcher Path", "Mixed Media Path"],
     "difficulty": 4,
     "title": "The Scroll of Unwritten Fates",
@@ -3284,7 +3284,7 @@
     "accepted": false,
     "acceptedAt": null
   },
-   "quest73": {
+ "quest73": {
     "path": ["Sketcher Path"],
     "difficulty": 1,
     "title": "The Path of the Endless Line",
@@ -3359,10 +3359,8 @@
 
 
 
-
-
     "3D's_Path_": "---------------------------------",
-    "quest53": {
+  "quest53": {
       "path": ["3D Path"],
       "difficulty": 3,
       "title": "The face stealer",
@@ -3420,11 +3418,19 @@
           }
         ]
       },
-      "links": [""],
+      "links": [
+        {
+          "type": "Armature sample",
+          "url": "https://www.youtube.com/watch?v=6dnyYu4Ff7U"
+        },
+        {
+          "type": "Video sample",
+          "url": "https://www.youtube.com/watch?v=2_BAaBJSwPI&list=PLziuS8DWCpjU7QFuM6wRH5C1R37aqb6OC&index=2"
+        }],
       "reward": "you got money!!!!",
       "character": "charimage/char53.gif",
       "style": "mvp",
-      "prerequisites": [],
+      "prerequisites": ["quest18","quest21","quest29"],
       "completed": false,
       "timer": {
     "allottedMinutes": 600},
@@ -3479,11 +3485,19 @@
           }
         ]
       },
-      "links": [""],
+      "links": [
+        {
+          "type": "Navajo Jewelry sample",
+          "url": "https://www.google.com.hk/search?newwindow=1&sca_esv=fc61e45fbff3d32e&udm=2&biw=1422&bih=650&q=navajo+jewelry&spell=1&sa=X&ved=2ahUKEwjD6pHdmPSSAxVZk4kEHcEHKy4QBSgAegQICRAB"
+        },
+        {
+          "type": "Video sample",
+          "url": "https://www.youtube.com/watch?v=_hP_qzgCmQg"
+        }],
       "reward": "you got money!!!!",
       "character": "charimage/char54.gif",
       "style": "mvp",
-      "prerequisites": [],
+      "prerequisites": ["quest13","quest67"],
       "completed": false,
       "timer": {
     "allottedMinutes": 600},
@@ -3538,8 +3552,21 @@
           }
         ]
       },
-      "links": [""],
-      "reward": "you got money!!!!",
+    "links": [
+      {
+        "type": "Relief tile sample",
+        "url": "https://www.google.com.hk/search?q=relief+sculpture+tile+&newwindow=1&sca_esv=4b6fd4b69e4fa74a&udm=2&biw=1422&bih=650&ei=YYmeadjqLPHk5NoPtfvc2Qg&ved=0ahUKEwiYn56e9fOSAxVxMlkFHbU9N4sQ4dUDCBI&uact=5&oq=relief+sculpture+tile+&gs_lp=Egtnd3Mtd2l6LWltZyIWcmVsaWVmIHNjdWxwdHVyZSB0aWxlIDIEEAAYHjIGEAAYCBgeMgYQABgIGB4yBhAAGAgYHkjKFFChBli-E3ABeACQAQCYAcoCoAHMB6oBAzMtM7gBA8gBAPgBAZgCBKACigjCAgYQABgHGB7CAgUQABiABMICBxAAGIAEGBPCAgYQABgTGB7CAggQABgTGAUYHpgDAIgGAZIHBTEuMy0zoAe9CLIHAzMtM7gH6gfCBwcyLTIuMS4xyAc0gAgA&sclient=gws-wiz-img"
+      },
+      {
+        "type": "Relief Video sample",
+        "url": "https://www.youtube.com/watch?v=NMrTzuubV5E"
+      },
+      {
+        "type":"Triptych sample",
+        "url":"https://www.google.com.hk/search?newwindow=1&sca_esv=4b6fd4b69e4fa74a&udm=2&q=triptych+art&spell=1&sa=X&ved=2ahUKEwi46faZ9_OSAxXNF1kFHTrHOzYQBSgAegQICRAB&biw=1422&bih=650&dpr=1.35"
+      }
+    ],
+      "reward": "",
       "character": "charimage/char56.gif",
       "style": "mvp",
       "prerequisites": [],
@@ -3682,11 +3709,20 @@
           }
         ]
       },
-      "links": [""],
-      "reward": "you got money!!!!",
+    "links": [
+      {
+        "type": "Image sample",
+        "url": "https://www.google.com.hk/search?newwindow=1&sca_esv=0bc02f2ac2b4de4c&q=student+architectural+models&uds=ALYpb_ncDc7jTlmw6Mmq7NjuX5c-wQPgXh9sSpT_vbsbQzRDLZjRxUXjO9i0Umkk2jK814fvsk4di_wO44GOtvzs65H4xKmhlVwiHFCHmuE_WKnuTuNZrjLfZuUt1uhoffsVz-3IIBgrbvaMzYey8fmcuKdKZnoG9dOlQtOEdaGWbrXjk3dq8jI&udm=2&sa=X&ved=2ahUKEwjgt6Ke_vWSAxWWMlkFHbYRFYgQxKsJKAN6BAgTEAE&ictx=0&biw=1422&bih=650&dpr=1.35"
+      },
+      {
+        "type": "Video samples",
+        "url": "https://www.youtube.com/watch?v=Kfj2-A5rJoQ&list=PLuJj3iQpiK3tr2QK32hCfl4QNop424DTj"
+      }
+    ],
+      "reward": "",
       "character": "charimage/char58.gif",
       "style": "mvp",
-      "prerequisites": [],
+      "prerequisites": ["quest48","quest63","quest43"],
       "completed": false,
       "timer": {
     "allottedMinutes": 600},
@@ -3703,7 +3739,8 @@
         "Create a sculpture that demonstrates balance",
         "Use mixed media",
         "Show symmetry or intentional asymmetry",
-        "Ensure the piece is stable and not top-heavy"
+        "Ensure the piece is stable and not top-heavy",
+        "The piece should be done on a 10x10 piece of board"
       ],
       "rubric": {
         "overall": "The Scales of Balance",
@@ -3740,8 +3777,17 @@
           }
         ]
       },
-      "links": [""],
-      "reward": "you got money!!!!",
+    "links": [
+      {
+        "type": "Principle od Design: Balance",
+        "url": "https://www.youtube.com/watch?v=oAcwYOBrYic"
+      },
+      {
+        "type": "Balance samples",
+        "url": "https://www.google.com.hk/search?q=sculpture+demonstrate+balance+rpinciple+of+deisgn+&newwindow=1&sca_esv=fc61e45fbff3d32e&udm=2&biw=1422&bih=650&ei=qV6eaY7CC5ypptQPuOSowQo&ved=0ahUKEwjOuqS_zPOSAxWclIkEHTgyKqgQ4dUDCBI&uact=5&oq=sculpture+demonstrate+balance+rpinciple+of+deisgn+&gs_lp=Egtnd3Mtd2l6LWltZyIyc2N1bHB0dXJlIGRlbW9uc3RyYXRlIGJhbGFuY2UgcnBpbmNpcGxlIG9mIGRlaXNnbiBIyx9QvglYtB5wAXgAkAEBmAHSAqAB0y2qAQQzLTE4uAEDyAEA-AEBmAIAoAIAmAMAiAYBkgcAoAeWB7IHALgHAMIHAMgHAIAIAA&sclient=gws-wiz-img"
+      }
+    ],
+      "reward": "",
       "character": "charimage/char59.gif",
       "style": "",
       "prerequisites": [],
@@ -3761,7 +3807,9 @@
         "Create a sculpture demonstrating contrast",
         "Use different textures and shapes",
         "Include a mix of thick and thin elements",
-        "Make contrasts clearly visible"
+        "Make contrasts clearly visible",
+        "The piece should be done on a 10x10 piece of board"
+
       ],
       "rubric": {
         "overall": "The Duel of Light and Shadow",
@@ -3798,8 +3846,17 @@
           }
         ]
       },
-      "links": [""],
-      "reward": "you got money!!!!",
+    "links": [
+      {
+        "type": "Principle od Design: Contrast",
+        "url": "https://www.youtube.com/watch?v=Ff60BS4ms2M"
+      },
+      {
+        "type": "Contrast samples",
+        "url": "https://www.google.com.hk/search?q=sculpture+demonstrate+contrast+principle+of+design&newwindow=1&sca_esv=fc61e45fbff3d32e&udm=2&biw=1422&bih=650&ei=hHGeabH6H4qhw8cPqdXM4AU&ved=0ahUKEwixzJG93vOSAxWK0PACHakqE1wQ4dUDCBI&uact=5&oq=sculpture+demonstrate+contrast+principle+of+design&gs_lp=Egtnd3Mtd2l6LWltZyIyc2N1bHB0dXJlIGRlbW9uc3RyYXRlIGNvbnRyYXN0IHByaW5jaXBsZSBvZiBkZXNpZ25IAFAAWABwAHgAkAEAmAEAoAEAqgEAuAEDyAEAmAIAoAIAmAMAkgcAoAcAsgcAuAcAwgcAyAcAgAgA&sclient=gws-wiz-img"
+      }
+    ],
+      "reward": "",
       "character": "charimage/char60.gif",
       "style": "",
       "prerequisites": [],
@@ -3819,7 +3876,8 @@
         "Create a sculpture with clear emphasis",
         "Use one strong focal point",
         "Use size, texture, or detail to emphasize",
-        "Support the focal point with surrounding forms"
+        "Support the focal point with surrounding forms",
+        "The piece should be done on a 10x10 piece of board"
       ],
       "rubric": {
         "overall": "The Heart of the Statue",
@@ -3856,9 +3914,18 @@
           }
         ]
       },
-      "links": [""],
-      "reward": "you got money!!!!",
-      "character": "charimage/char61.png",
+    "links": [
+      {
+        "type": "Principle od Design: Enphasis",
+        "url": "https://www.youtube.com/watch?v=Nda6SXbgs_Q"
+      },
+      {
+        "type": "Emphasis samples",
+        "url": "https://springsemester2015artz363.wordpress.com/emphasis/"
+      }
+    ],
+      "reward": "",
+      "character": "charimage/char61.gif",
       "style": "",
       "prerequisites": [],
       "completed": false,
@@ -3877,7 +3944,8 @@
         "Create a sculpture that suggests movement",
         "Use flowing lines or dynamic shapes",
         "Show direction and rhythm",
-        "Make the movement clear from different angles"
+        "Make the movement clear from different angles",
+        "The piece should be done on a 10x10 piece of board"
       ],
       "rubric": {
         "overall": "The Dance of the Wind",
@@ -3914,9 +3982,18 @@
           }
         ]
       },
-      "links": [""],
-      "reward": "you got money!!!!",
-      "character": "",
+    "links": [
+      {
+        "type": "Principle od Design: Movement",
+        "url": "https://www.youtube.com/watch?v=9Yw8gClysNg"
+      },
+      {
+        "type": "Movement samples",
+        "url": "https://www.google.com.hk/search?q=sculpture++movement+principle+of+design&newwindow=1&sca_esv=fc61e45fbff3d32e&udm=2&biw=1422&bih=650&ei=PHOeaepfsdym1A_ClKaYAg&ved=0ahUKEwjq7dmO4POSAxUxrokEHUKKCSMQ4dUDCBI&uact=5&oq=sculpture++movement+principle+of+design&gs_lp=Egtnd3Mtd2l6LWltZyInc2N1bHB0dXJlICBtb3ZlbWVudCBwcmluY2lwbGUgb2YgZGVzaWduSLUHULMFWLMFcAJ4AJABAJgBAKABAKoBALgBA8gBAPgBAZgCAKACAJgDAIgGAZIHAKAHALIHALgHAMIHAMgHAIAIAA&sclient=gws-wiz-img"
+      }
+    ],
+      "reward": "",
+      "character": "charimage/char62.gif",
       "style": "",
       "prerequisites": [],
       "completed": false,
@@ -3935,7 +4012,8 @@
         "Create a sculpture showing rhythm",
         "Use repeated shapes or patterns",
         "Create a sense of movement through repetition",
-        "Maintain visual consistency"
+        "Maintain visual consistency",
+        "The piece should be done on a 10x10 piece of board"
       ],
       "rubric": {
         "overall": "The Echoing Repetition",
@@ -3972,8 +4050,17 @@
           }
         ]
       },
-      "links": [""],
-      "reward": "you got money!!!!",
+    "links": [
+      {
+        "type": "Principle od Design: Rhythm",
+        "url": "https://www.youtube.com/watch?v=seey_uNt7V8"
+      },
+      {
+        "type": "Rhythm samples",
+        "url": "https://www.google.com.hk/search?q=sculpture+demonstrate+rhytnm+pinciple+of+design&newwindow=1&sca_esv=fc61e45fbff3d32e&udm=2&biw=1422&bih=650&ei=fXGeaefvB8SoptQP4c--iQk&ved=0ahUKEwinos653vOSAxVElIkEHeGnL5EQ4dUDCBI&uact=5&oq=sculpture+demonstrate+rhytnm+pinciple+of+design&gs_lp=Egtnd3Mtd2l6LWltZyIvc2N1bHB0dXJlIGRlbW9uc3RyYXRlIHJoeXRubSBwaW5jaXBsZSBvZiBkZXNpZ25I6Q5QvwdYvwdwAXgAkAEAmAHnAqAB5wKqAQMzLTG4AQPIAQD4AQGYAgCgAgCYAwDiAwUSATEgQIgGAZIHAKAHM7IHALgHAMIHAMgHAIAIAA&sclient=gws-wiz-img"
+      }
+    ],
+      "reward": "",
       "character": "charimage/char63.gif",
       "style": "",
       "prerequisites": [],
@@ -4042,10 +4129,22 @@
         }
       ]
     },
+        "links": [
+      {
+        "type": "Cosplay video sample",
+        "url": "https://www.youtube.com/watch?v=-WUi1VhVFdo"
+      },
+      {
+        "type": "Cosplay video sample",
+        "url": "https://www.youtube.com/watch?v=dN3NHy7Asqc&t=359s"
+      },
+    {
+      "type":"Cosplay video sample",
+      "url":"https://www.youtube.com/watch?v=1xHLiR0e8s4"
+    }],
     "reward": "",
     "character": "charimage/char68.gif",
-    "style": "mvp"
-    ,
+    "style": "mvp",
     "prerequisites": [],
     "completed": false,
       "timer": {
@@ -4054,7 +4153,7 @@
   "acceptedAt": null
   },
   "quest70": {
-    "path": ["3D Path", "Mixed Media Path"],
+    "path": ["3D Path"],
     "difficulty": 3,
     "title": "The Animist's Awakening",
     "rationale": "<h2>The Animist's Awakening</h2><p><strong>Why it's important:</strong><br>This summative quest bridges functional design with artistic expression. Redesigning an everyday object teaches students to analyze form, function, and aesthetics while developing creative problem-solving skills. The challenge requires both technical 3D construction and conceptual thinking about how objects 'live' in our world.</p><p><strong>Skills developed:</strong></p><ul><li>Analytical observation of existing objects</li><li>Conceptual redesign and creative transformation</li><li>3D construction with mixed media</li><li>Functional and aesthetic balance</li><li>Process documentation from research to final product</li></ul><p>This quest prepares students for design thinking and encourages them to see the artistic potential in everyday items.</p>",
@@ -4144,7 +4243,7 @@
   "acceptedAt": null
   },
   "quest71": {
-    "path": ["3D Path", "Mixed Media Path"],
+    "path": ["3D Path"],
     "difficulty": 3,
     "title": "The Dreamweaver's Gambit",
     "rationale": "<h2>The Dreamweaver's Gambit</h2><p><strong>Why it's important:</strong><br>This quest combines art history, technical craft, and conceptual translation. Needle felting requires patience, precision, and spatial thinking while reproducing a 2D painting in 3D wool teaches students to analyze color, composition, and texture in new dimensions. The challenge of translating brushstrokes into wool fibers develops both observational skills and material mastery.</p><p><strong>Skills developed:</strong></p><ul><li>Art historical analysis and interpretation</li><li>Needle felting technique and wool manipulation</li><li>Color theory application with fiber materials</li><li>Spatial translation from 2D to 3D form</li><li>Patience and precision in craft execution</li></ul><p>This quest demonstrates how traditional crafts can reinterpret fine art, bridging historical and contemporary making practices.</p>",

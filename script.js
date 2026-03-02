@@ -148,10 +148,30 @@ function saveWorkData() {
 
 function deleteWorkImage() {
   const preview = document.getElementById("image-preview");
+  const overlay = document.getElementById("work-overlay");
+  const questId = overlay.dataset.questId;
+  
+  if (!questId) {
+    console.error("No quest ID found");
+    return;
+  }
+  
+  // Confirm deletion with the user
+  if (!confirm("Are you sure you want to delete this work completely? All title, description, and image will be removed.")) {
+    return;
+  }
+  
+  // Clear the image preview
   if (preview) {
     preview.src = "";
     preview.style.display = "none";
   }
+  
+  // Clear all form fields
+  document.getElementById("work-title").value = "";
+  document.getElementById("work-size").value = "";
+  document.getElementById("work-media").value = "";
+  document.getElementById("work-description").value = "";
   
   // Clear the file input
   const imageInput = document.getElementById("work-image");
@@ -159,13 +179,18 @@ function deleteWorkImage() {
     imageInput.value = "";
   }
   
-  // Also remove the image from the saved data for the current quest
-  const overlay = document.getElementById("work-overlay");
-  const questId = overlay.dataset.questId;
-  
-  if (questId && studentWorks[questId]) {
-    studentWorks[questId].image = "";
+  // COMPLETELY REMOVE the work entry from studentWorks
+  if (studentWorks[questId]) {
+    delete studentWorks[questId]; // This removes the entire entry
     saveStudentWorks();
+    
+    // Refresh gallery if it's open
+    const galleryOverlay = document.getElementById("gallery-overlay");
+    if (galleryOverlay && galleryOverlay.style.display === "flex") {
+      renderGalleryItems();
+    }
+    
+    console.log(`Work for quest ${questId} completely deleted`);
   }
 }
 
@@ -5181,3 +5206,4 @@ document.addEventListener("keydown", (e) => {
         closePrerequisitePopup();
     }
 });
+

@@ -3141,7 +3141,15 @@
           }
         ]
       },
-      "links": [""],
+      "links": [
+      {
+      "type": "Foreshortening video",
+      "url": "https://www.youtube.com/watch?v=eJWLaDSNBAI&t=1s"
+      },
+      {
+      "type": "Foreshortening video",
+      "url": "https://www.youtube.com/watch?v=r0VInG0fgpo"
+      },
       "reward": "you got money!!!!",
       "character": "charimage/char47.gif",
       "style": "",

@@ -2028,7 +2028,7 @@
           "url": "https://www.youtube.com/watch?v=d-Ig3oS0MNw&list=PL11cgqhXTA7BEj8MCbeX768mCW9WLmKBe&index=11"
         }
       ],
-      "reward": "you got money!!!!",
+      "reward": "",
       "character": "charimage/char25.gif",
       "style": "mvp",
       "prerequisites": ["quest32","quest65","quest42","quest43"],
@@ -2949,7 +2949,9 @@
           }
         ]
       },
-      "links": [""],
+      "links": [{"type": "2. Perspective Cubes","url": "https://www.youtube.com/watch?v=_RkTjSK4vdU"},
+        {"type": "2. Perspective objects","url": "https://www.youtube.com/watch?v=V91NxMMm35U"},
+        {"type": "2. Perspective buildings","url": "https://www.youtube.com/watch?v=yNq78n02fMQ&list=PLnifj-hFGWC_QgnImNiEBostbMIGkLYrr"}],
       "reward": "",
       "character": "charimage/char43.gif",
       "style": "",
@@ -2997,8 +2999,11 @@
           }
         ]
       },
-      "links": [""],
-      "reward": "you got money!!!!",
+      "links": [{"type": "3. Perspective Cubes B.E.V.","url": "https://www.youtube.com/shorts/viEWFXPwYcQ"},
+        {"type": "3. Perspective objects","url": "https://www.youtube.com/watch?v=7EN-wROFYeQ"},
+        {"type": "3. Perspective buildings","url": "https://www.youtube.com/watch?v=wwcldMKlzjg&list=PLnifj-hFGWC_bLg1r85alMZd7WjLshK3_"},
+        {"type": "3. Perspective person","url":https://www.youtube.com/shorts/XNFNhpIBIek"}],
+      "reward": "",
       "character": "charimage/char44.gif",
       "style": "",
       "prerequisites": [],
@@ -3045,8 +3050,10 @@
           }
         ]
       },
-      "links": [""],
-      "reward": "you got money!!!!",
+       "links": [{"type": "4. Perspective Cubes","url": "https://www.youtube.com/watch?v=yF_HXHEZKSk"},
+        {"type": "4. Perspective image sample", "url": :https://i.pinimg.com/736x/12/b2/6f/12b26f1fe674c9f3fe26bdab9f3fe461.jpg"},
+        {"type": "4. Perspective","url": "https://www.youtube.com/watch?v=lmrHPGFYIVg"}],
+      "reward": "",
       "character": "charimage/char45.gif",
       "style": "",
       "prerequisites": [],
@@ -3093,7 +3100,9 @@
           }
         ]
       },
-      "links": [""],
+       "links": [{"type": "5. Perspective","url": "https://www.youtube.com/watch?v=6NM8J5fmM3Y"},
+        {"type": "5. Perspective","url": "https://www.youtube.com/shorts/zbwYR4oLm74"},
+        {"type": "5. Perspective buildings","url": "https://www.youtube.com/watch?v=9NtpF3QkCxk"}],
       "reward": "you got money!!!!",
       "character": "charimage/char46.gif",
       "style": "",

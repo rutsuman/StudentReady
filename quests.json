@@ -2736,7 +2736,7 @@
       "reward": "you got money!!!!",
       "character": "charimage/char30a.gif",
       "style": "mvp",
-      "prerequisites": [],
+      "prerequisites": ["quest39","quest42","quest43","quest44","quest45","quest46"],
       "completed": false,
       "timer": {
     "allottedMinutes": 375},
@@ -3290,7 +3290,7 @@
     "reward": "",
     "character": "charimage/char72.gif",
     "style": "mvp",
-    "prerequisites": ["quest30", "quest39", "quest47"],
+    "prerequisites": ["quest39", "quest47","quest42","quest43","quest44","quest45","quest46"],
     "completed": false,
     "timer": {
       "allottedMinutes": 750
